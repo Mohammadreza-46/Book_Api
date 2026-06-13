@@ -1,0 +1,48 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.env/
+.venv/
+env/
+ENV/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# IDE / editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python cache / test artifacts
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Flask / instance config
+instance/
+*.sqlite3
+
+# Environment variables / secrets
+.env.local
+.env.*.local
+
+# Project-specific data that probably shouldn't be versioned
+data/Keys.json
+data/Users/
