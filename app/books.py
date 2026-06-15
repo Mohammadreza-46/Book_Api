@@ -79,7 +79,7 @@ def delete_book(book_id):
 @books_bp.route('/search', methods=['POST'])
 @jwt_required()
 def search():
-    data = request.get_query()
+    data = request.get_json()
     show = []
     required = [('book_name',str),('genre',str),('writer',str)]
     if check_data_nl(data,required):
