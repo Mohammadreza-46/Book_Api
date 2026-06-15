@@ -7,15 +7,11 @@ def check_data(data,required):
         if not isinstance(data[field], ftype):
             return False
     return True
-def check_data_nl(data,required):
-    x = 0
+def check_data_nl(data, required):
     if data is None:
         return False
+    found_any = False
     for field, ftype in required:
-        if field not in data.keys():
-            x += 1
-        if isinstance(data[field], ftype):
-            return False
-    if x == len(required):
-        return False
-    return True
+        if field in data and isinstance(data[field], ftype):
+            found_any = True
+    return found_any
