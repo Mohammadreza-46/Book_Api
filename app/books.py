@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime
 import os
 import json
-from check_data import check_data,check_data_nl
+import check_data
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from pathlib import Path
 
@@ -38,9 +38,9 @@ def add_book():
         ,('genre',str),
         ('created_at',str)
     ]
-    if check_data(data,required):
+    if check_data.check_data(data,required):
         pass
-    elif not check_data_nl(data,required):
+    elif not check_data.check_data_nl(data,required):
         return jsonify({'message': 'Data is bad!'}), 400
     new_book = {
         'book_name': data['book_name'],
@@ -82,9 +82,9 @@ def search():
     data = request.get_json()
     show = []
     required = [('book_name',str),('genre',str),('writer',str)]
-    if check_data_nl(data,required):
+    if check_data.check_data_nl(data,required):
         pass
-    elif not check_data_nl(data,required):
+    elif not check_data.check_data_nl(data,required):
         return jsonify({'message': 'Data is bad!'}), 400
     if 'book_name' not in data and 'genre' not in data and 'writer' not in data:
         return jsonify({'Data is none'}), 400
@@ -115,9 +115,9 @@ def update_book(book_id):
         , ('genre', str),
         ('created_at', str)
     ]
-    if check_data(data,required):
+    if check_data.check_data(data,required):
         pass
-    elif not check_data(data,required):
+    elif not check_data.check_data(data,required):
         return jsonify({'message': 'Data is bad!'}), 400
     new_book = None
     for i in book.values():
