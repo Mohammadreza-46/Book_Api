@@ -86,19 +86,19 @@ def search():
         pass
     elif not check_data_nl(data,required):
         return jsonify({'message': 'Data is bad!'}), 400
-    if 'book_name' not in data and 'genre' not in data or 'writer' not in data:
+    if 'book_name' not in data and 'genre' not in data and 'writer' not in data:
         return jsonify({'Data is none'}), 400
     if 'book_name' in data:
         for i in book.values():
-            if i['book_name'].lower() in data['book_name'].lower():
+            if data['book_name'].lower() in i['book_name'].lower():
                 show.append(i)
     elif 'genre' in data:
         for i in book.values():
-            if i['genre'].lower() in data['genre'].lower():
+            if data['genre'].lower() in i['genre'].lower():
                 show.append(i)
     elif 'writer' in data:
         for i in book.values():
-            if i['writer'].lower() in data['writer'].lower():
+            if data['writer'].lower() in i['writer'].lower():
                 show.append(i)
     return jsonify(show), 200
 @books_bp.route('/update_book/<int:book_id>', methods=['POST'])
