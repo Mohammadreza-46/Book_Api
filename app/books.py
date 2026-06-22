@@ -48,7 +48,7 @@ def add_book():
     ]
     if check_data.check_data(data,required):
         pass
-    elif not check_data.check_data_nl(data,required):
+    elif not check_data.check_data(data,required):
         return jsonify({'message': 'Data is bad!'}), 400
     new_book = {
         'book_name': data['book_name'],
