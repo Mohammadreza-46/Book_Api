@@ -5,6 +5,9 @@ import json
 import check_data
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 def is_owner(book_entry, username):
     return book_entry.get('added_by') == username
@@ -53,6 +56,7 @@ def add_book():
     if check_data.check_data(data,required):
         pass
     elif not check_data.check_data(data,required):
+        logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('data is bad!', 400)
     new_book = {
         'book_name': data['book_name'],
@@ -70,11 +74,13 @@ def add_book():
         return error_response('book_id already exists!', 400)
     book[str(new_book['book_id'])] = new_book
     save_books(book)
+    logger.info(f'{get_jwt_identity()} added book {new_book["book_id"]}')
     return jsonify({'Success': 'New book added'}), 201
 @books_bp.route('/delete_book/<int:book_id>', methods=['DELETE'])
 @jwt_required()
 def delete_book(book_id):
     if not is_owner(book[str(book_id)],get_jwt_identity()):
+        logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('you are not authorized!', 401)
     deleted_book = None
     for i in book.values():
@@ -82,9 +88,11 @@ def delete_book(book_id):
             deleted_book = str(i['book_id'])
             break
     if deleted_book == None:
+        logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('book_id not found!', 404)
     del book[int(deleted_book)]
     save_books(book)
+    logger.info(f'{get_jwt_identity()} deleted book {book_id}')
     return jsonify({'Success': 'Book deleted'}), 200
 @books_bp.route('/search', methods=['POST'])
 @jwt_required()
@@ -126,6 +134,7 @@ def update_book(book_id):
     if check_data.check_data(data,required):
         pass
     elif not check_data.check_data(data,required):
+        logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('The data content not has all the required fields!', 400)
     new_book = None
     for i in book.values():
@@ -142,9 +151,11 @@ def update_book(book_id):
             i['added_by'] = get_jwt_identity()
             new_book = i
     if new_book is None:
+        logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('book_id not found!', 404)
     book[new_book['book_id']] = new_book
     save_books(book)
+    logger.info(f'{get_jwt_identity()} updated book {book_id}')
     return jsonify({'Success': 'Book updated'}), 200
 @books_bp.route('/get_book/<int:book_id>', methods=['get'])
 @jwt_required()
