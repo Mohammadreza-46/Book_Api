@@ -9,6 +9,8 @@ import datetime
 from pathlib import Path
 import re
 
+def error_response(message, status_code):
+    return jsonify({'message': message}), status_code
 file = Path(__file__).resolve()
 dir_name = file.parent.parent
 
@@ -36,20 +38,19 @@ def signup():
     if check_data.check_data(data, required):
         pass
     elif not check_data.check_data(data, required):
-        return jsonify({'message': 'data is bad'}), 400
+        return error_response('data is none',400)
     if len(data['username']) < 8:
-        return jsonify({'message': 'username is too short'}),400
+        return error_response('username is too short',400)
     if not re.match(r'^[a-zA-Z0-9_]+$', data['username']):
-        return jsonify({'message': 'Username can only contain letters, numbers, and underscores'}), 400
+        return error_response('Username can only contain letters, numbers, and underscores',400)
     if not isinstance(data['password'], str):
-        return jsonify({'message': 'password is not string'}),400
+        return error_response('password is not a string',400)
     if not isinstance(data['username'], str):
-
-        return jsonify({'message': 'username is not string'}),400
+        return error_response('username is not a string',400)
     data['password'] = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
     file_name = os.path.join(os.path.join(dir_name,os.path.join('data','Users')),data['username'])+'.json'
     if os.path.exists(file_name):
-        return jsonify({'message': 'Username already exists'}), 409
+        return error_response('username already exists',400)
     with open(file_name, 'w') as f:
         f.write(json.dumps(data))
     return jsonify({'message': 'success'})
@@ -58,7 +59,7 @@ def signup():
 def login():
     data = request.get_json()
     if data is None or 'password' not in data or 'username' not in data:
-        return jsonify({'message': 'not have all'}), 400
+        return error_response('data is none',400)
     plain = data['password'].encode('utf-8')
     try:
         file_name = os.path.join(os.path.join(dir_name, os.path.join('data','Users')), data['username']) + '.json'
@@ -72,9 +73,9 @@ def login():
                 return jsonify({'message': 'success', 'token': token, 'refresh_token': refresh_token}), 200
             elif not bcrypt.checkpw(plain, stored) or json_data['username'] != data['username']:
                 logger.warning(f'{data['username']} not loged!')
-                return jsonify({'message': 'Username or Password is bad'}), 400
+                return error_response('username and password do not match',400)
     except FileNotFoundError:
-        return jsonify({'message': 'Username or Password is bad'}), 400
+        return error_response('username and password do not match',400)
 @auth_bp.route('/refresh_token', methods=['POST'])
 @jwt_required(refresh=True)
 def refresh_token():

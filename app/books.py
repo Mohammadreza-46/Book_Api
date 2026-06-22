@@ -6,6 +6,8 @@ import check_data
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from pathlib import Path
 
+def error_response(message, status_code):
+    return jsonify({'message': message}), status_code
 dir_name = Path(__file__).resolve().parent.parent
 BOOKS_FILE = os.path.join(dir_name, 'data', 'Book_Loader.json')
 
@@ -49,7 +51,7 @@ def add_book():
     if check_data.check_data(data,required):
         pass
     elif not check_data.check_data(data,required):
-        return jsonify({'message': 'Data is bad!'}), 400
+        return error_response('data is bad!', 400)
     new_book = {
         'book_name': data['book_name'],
         'book_content': data['book_content'],
@@ -63,7 +65,7 @@ def add_book():
         'added_by': get_jwt_identity()
     }
     if str(new_book['book_id']) in book:
-        return jsonify({'message': 'edit book_id!'}), 400
+        return error_response('book_id already exists!', 400)
     book[str(new_book['book_id'])] = new_book
     save_books(book)
     return jsonify({'Success': 'New book added'}), 201
@@ -71,14 +73,14 @@ def add_book():
 @jwt_required()
 def delete_book(book_id):
     if not get_jwt_identity() == book[book_id]['added_by']:
-        return jsonify({'message': 'You can\'t delete it!'}), 404
+        return error_response('you are not authorized!', 401)
     deleted_book = None
     for i in book.values():
         if i["book_id"] == book_id:
             deleted_book = str(i['book_id'])
             break
     if deleted_book == None:
-        return jsonify({'error': 'Not found!'}), 404
+        return error_response('book_id not found!', 404)
     del book[int(deleted_book)]
     save_books(book)
     return jsonify({'Success': 'Book deleted'}), 200
@@ -91,9 +93,7 @@ def search():
     if check_data.check_data_nl(data,required):
         pass
     elif not check_data.check_data_nl(data,required):
-        return jsonify({'message': 'Data is bad!'}), 400
-    if 'book_name' not in data and 'genre' not in data and 'writer' not in data:
-        return jsonify({'Data is none'}), 400
+        return error_response('At least one search field is required', 400)
     if 'book_name' in data:
         for i in book.values():
             if data['book_name'].lower() in i['book_name'].lower():
@@ -124,7 +124,7 @@ def update_book(book_id):
     if check_data.check_data(data,required):
         pass
     elif not check_data.check_data(data,required):
-        return jsonify({'message': 'Data is bad!'}), 400
+        return error_response('The data content not has all the required fields!', 400)
     new_book = None
     for i in book.values():
         if i['book_id'] == book_id and get_jwt_identity() == i['added_by']:
@@ -140,9 +140,9 @@ def update_book(book_id):
             i['added_by'] = get_jwt_identity()
             new_book = i
     if new_book is None:
-        return jsonify({'message': 'Not found!'}), 404
+        return error_response('book_id not found!', 404)
     book[new_book['book_id']] = new_book
-    save_books[book]
+    save_books(book)
     return jsonify({'Success': 'Book updated'}), 200
 @books_bp.route('/get_book/<int:book_id>', methods=['get'])
 @jwt_required()
@@ -150,4 +150,4 @@ def get_book(book_id):
     for i in book.values():
         if i['book_id'] == book_id:
             return jsonify(i), 200
-    return jsonify({'message': 'Not found!'}), 404
+    return error_response('book_id not found!', 404)
