@@ -6,13 +6,21 @@ import check_data
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from pathlib import Path
 
-file = Path(__file__).resolve()
-dir_name = file.parent.parent
+dir_name = Path(__file__).resolve().parent.parent
+BOOKS_FILE = os.path.join(dir_name, 'data', 'Book_Loader.json')
+
+def load_books() -> dict:
+    with open(BOOKS_FILE) as f:
+        return json.load(f)
+
+def save_books(books: dict) -> None:
+    tmp_path = BOOKS_FILE + '.tmp'
+    with open(tmp_path, 'w') as f:
+        json.dump(books, f)
+    os.replace(tmp_path, BOOKS_FILE)
+
 books_bp = Blueprint('books', __name__)
-print(dir_name)
-with open(os.path.join(os.path.join(dir_name,'data'),'Book_Loader.json')) as f:
-    data = json.load(f)
-    book = data
+book = load_books()
 
 @books_bp.route('/get_all_book', methods=['GET'])
 @jwt_required()
@@ -57,8 +65,7 @@ def add_book():
     if str(new_book['book_id']) in book:
         return jsonify({'message': 'edit book_id!'}), 400
     book[str(new_book['book_id'])] = new_book
-    with open(os.path.join(os.path.join(dir_name,"data"),"Book_Loader.json"), 'w') as f:
-        f.write(json.dumps(book))
+    save_books(book)
     return jsonify({'Success': 'New book added'}), 201
 @books_bp.route('/delete_book/<int:book_id>', methods=['DELETE'])
 @jwt_required()
@@ -73,8 +80,7 @@ def delete_book(book_id):
     if deleted_book == None:
         return jsonify({'error': 'Not found!'}), 404
     del book[int(deleted_book)]
-    with open(os.path.join(os.path.join(dir_name,"data"),'Book_Loader.json'), 'w') as f:
-        f.write(json.dumps(book))
+    save_books(book)
     return jsonify({'Success': 'Book deleted'}), 200
 @books_bp.route('/search', methods=['POST'])
 @jwt_required()
@@ -136,8 +142,7 @@ def update_book(book_id):
     if new_book is None:
         return jsonify({'message': 'Not found!'}), 404
     book[new_book['book_id']] = new_book
-    with open(os.path.join(os.path.join(dir_name,'data'),'Book_Loader.json'),'w') as f:
-        f.write(json.dumps(book))
+    save_books[book]
     return jsonify({'Success': 'Book updated'}), 200
 @books_bp.route('/get_book/<int:book_id>', methods=['get'])
 @jwt_required()
