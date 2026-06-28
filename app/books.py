@@ -79,9 +79,6 @@ def add_book():
 @books_bp.route('/delete_book/<int:book_id>', methods=['DELETE'])
 @jwt_required()
 def delete_book(book_id):
-    if not is_owner(book[str(book_id)],get_jwt_identity()):
-        logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
-        return error_response('you are not authorized!', 401)
     deleted_book = None
     for i in book.values():
         if i["book_id"] == book_id:
@@ -90,7 +87,10 @@ def delete_book(book_id):
     if deleted_book == None:
         logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('book_id not found!', 404)
-    del book[int(deleted_book)]
+    if not is_owner(book[str(book_id)],get_jwt_identity()):
+        logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
+        return error_response('you are not authorized!', 401)
+    del book[deleted_book]
     save_books(book)
     logger.info(f'{get_jwt_identity()} deleted book {book_id}')
     return jsonify({'Success': 'Book deleted'}), 200
