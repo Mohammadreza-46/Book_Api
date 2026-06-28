@@ -153,7 +153,7 @@ def update_book(book_id):
     if new_book is None:
         logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('book_id not found!', 404)
-    book[new_book['book_id']] = new_book
+    book[str(new_book['book_id'])] = new_book
     save_books(book)
     logger.info(f'{get_jwt_identity()} updated book {book_id}')
     return jsonify({'Success': 'Book updated'}), 200
