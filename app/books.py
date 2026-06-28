@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime
 import os
 import json
-import check_data
+import app.check_data
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from pathlib import Path
 import logging
