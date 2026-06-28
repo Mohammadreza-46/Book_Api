@@ -89,7 +89,7 @@ def delete_book(book_id):
         return error_response('book_id not found!', 404)
     if not is_owner(book[str(book_id)],get_jwt_identity()):
         logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
-        return error_response('you are not authorized!', 401)
+        return error_response('you are not authorized!', 403)
     del book[deleted_book]
     save_books(book)
     logger.info(f'{get_jwt_identity()} deleted book {book_id}')
