@@ -108,11 +108,11 @@ def search():
         for i in book.values():
             if data['book_name'].lower() in i['book_name'].lower():
                 show.append(i)
-    elif 'genre' in data:
+    if 'genre' in data:
         for i in book.values():
             if data['genre'].lower() in i['genre'].lower():
                 show.append(i)
-    elif 'writer' in data:
+    if 'writer' in data:
         for i in book.values():
             if data['writer'].lower() in i['writer'].lower():
                 show.append(i)
