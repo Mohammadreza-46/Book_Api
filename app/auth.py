@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 import os
 import bcrypt
 import json
-import app.check_data
+from app.check_data import check_data
 import logging
 from flask_jwt_extended import create_access_token, create_refresh_token,jwt_required,get_jwt_identity
 import datetime
@@ -35,9 +35,9 @@ def make_refresh_token(identity):
 def signup():
     data = request.get_json()
     required = [('username',str), ('password',str)]
-    if check_data.check_data(data, required):
+    if check_data(data, required):
         pass
-    elif not check_data.check_data(data, required):
+    elif not check_data(data, required):
         return error_response('data is none',400)
     if len(data['username']) < 8:
         return error_response('username is too short',400)
@@ -58,7 +58,8 @@ def signup():
 @auth_bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
-    if data is None or 'password' not in data or 'username' not in data:
+    required = [('username',str),('password',str)]
+    if check_data(data,required):
         return error_response('data is none',400)
     plain = data['password'].encode('utf-8')
     try:
