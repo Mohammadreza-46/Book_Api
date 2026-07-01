@@ -68,10 +68,10 @@ def login():
             if bcrypt.checkpw(plain, stored) and json_data['username'] == data['username']:
                 token = make_token(json_data['username'])
                 refresh_token = make_refresh_token(json_data['username'])
-                logger.info(f'{data['username']} loged!')
+                logger.info(f"{data['username']} loged!")
                 return jsonify({'message': 'success', 'token': token, 'refresh_token': refresh_token}), 200
             elif not bcrypt.checkpw(plain, stored) or json_data['username'] != data['username']:
-                logger.warning(f'{data['username']} not loged!')
+                logger.warning(f"{data['username']} not loged!")
                 return error_response('username and password do not match',400)
     except FileNotFoundError:
         return error_response('username and password do not match',400)
