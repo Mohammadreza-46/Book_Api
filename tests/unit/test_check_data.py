@@ -10,7 +10,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 import pytest
-from check_data import check_data, check_data_nl
+from app.check_data import check_data, check_data_nl
 
 
 REQUIRED_FIELDS = [("name", str), ("age", int), ("active", bool)]
