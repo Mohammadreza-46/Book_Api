@@ -43,10 +43,8 @@ def signup():
         return error_response('username is too short',400)
     if not re.match(r'^[a-zA-Z0-9_]+$', data['username']):
         return error_response('Username can only contain letters, numbers, and underscores',400)
-    if not isinstance(data['password'], str):
-        return error_response('password is not a string',400)
-    if not isinstance(data['username'], str):
-        return error_response('username is not a string',400)
+    if not isinstance(data.get('username'), str) or not isinstance(data.get('password'), str):
+        return error_response('username and password must be strings', 400)
     data['password'] = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
     file_name = os.path.join(os.path.join(dir_name,os.path.join('data','Users')),data['username'])+'.json'
     if os.path.exists(file_name):
