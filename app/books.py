@@ -33,8 +33,8 @@ book = load_books()
 @jwt_required()
 def get_all_book():
     book2 = list(book.values())
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 10, type=int)
+    page = max(request.args.get('page', 1, type=int), 1)
+    per_page = max(request.args.get('per_page', 10, type=int), 0)
     start = (page - 1) * per_page
     end = start + per_page
     paginated = book2[start:end]
