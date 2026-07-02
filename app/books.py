@@ -143,6 +143,9 @@ def update_book(book_id):
     elif not check_data(data,required):
         logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('The data content not has all the required fields!', 400)
+    if not is_owner(book_id,get_jwt_identity()):
+        logger.warning(f'{get_jwt_identity()} is not the owner {request.path}')
+        error_response('You are not authorized!', 403)
     if data['rating'] < 0 or data['rating'] > 5:
         logger.warning(f"{get_jwt_identity} sent invalid data to {request.path}")
         return error_response('the rating is out of the range(0/5)',400)
