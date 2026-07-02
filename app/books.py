@@ -58,6 +58,13 @@ def add_book():
     elif not check_data(data,required):
         logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('data is bad!', 400)
+    if data['rating'] < 0 or data['rating'] > 5:
+        logger.warning(f"{get_jwt_identity} sent invalid data to {request.path}")
+        return error_response('the rating is out of the range(0/5)',400)
+    curent_year = datetime.today().year
+    if data['published_year'] < 0 or data['published_year'] > curent_year:
+        logger.warning(f"{get_jwt_identity()} sent invalid data to {request.path}")
+        return error_response(f'the published_year is out of the range(0/{curent_year})',400)
     new_book = {
         'book_name': data['book_name'],
         'book_content': data['book_content'],
@@ -136,6 +143,13 @@ def update_book(book_id):
     elif not check_data(data,required):
         logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('The data content not has all the required fields!', 400)
+    if data['rating'] < 0 or data['rating'] > 5:
+        logger.warning(f"{get_jwt_identity} sent invalid data to {request.path}")
+        return error_response('the rating is out of the range(0/5)',400)
+    curent_year = datetime.today().year
+    if data['published_year'] < 0 or data['published_year'] > curent_year:
+        logger.warning(f"{get_jwt_identity()} sent invalid data to {request.path}")
+        return error_response(f'the published_year is out of the range(0/{curent_year})',400)
     new_book = None
     for i in book.values():
         if i['book_id'] == book_id and is_owner(i,get_jwt_identity()):
