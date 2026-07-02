@@ -8,7 +8,12 @@ app = Flask(__name__)
 books_bp = books.books_bp
 auth_bp = auth.auth_bp
 jwt_manager = JWTManager(app)
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY')
+
+secret = os.environ.get('JWT_SECRET_KEY')
+
+if not secret or len(secret) < 32:
+    raise RuntimeError('JWT_SECRET_KEY must be set and at least 32 characters')
+app.config['JWT_SECRET_KEY'] = secret
 
 app.register_blueprint(books_bp)
 app.register_blueprint(auth_bp)
