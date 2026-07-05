@@ -59,6 +59,8 @@ def login():
     required = [('username',str),('password',str)]
     if check_data(data,required):
         return error_response('data is none',400)
+    if not isinstance(data.get('username'), str) or not isinstance(data.get('password'), str):
+        return error_response('username and password must be strings', 400)
     plain = data['password'].encode('utf-8')
     try:
         file_name = os.path.join(os.path.join(dir_name, os.path.join('data','Users')), data['username']) + '.json'
