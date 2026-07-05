@@ -5,7 +5,7 @@ def check_data(data,required):
         if field not in data.keys():
             return False
         if not isinstance(data[field], ftype):
-            if ftype == str and field == '':
+            if ftype == str and data[field].strip() == '':
                 return False
             return False
     return True
@@ -15,7 +15,7 @@ def check_data_nl(data, required):
     found_any = False
     for field, ftype in required:
         if field in data and isinstance(data[field], ftype):
-            if ftype == str and field == '':
-                return False
+            if ftype == str and data[field].strip() == '':
+                continue
             found_any = True
     return found_any
