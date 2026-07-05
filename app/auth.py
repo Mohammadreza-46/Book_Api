@@ -57,7 +57,7 @@ def signup():
 def login():
     data = request.get_json()
     required = [('username',str),('password',str)]
-    if check_data(data,required):
+    if not check_data(data,required):
         return error_response('data is none',400)
     if not isinstance(data.get('username'), str) or not isinstance(data.get('password'), str):
         return error_response('username and password must be strings', 400)
