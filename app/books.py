@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 def is_owner(book_entry, username):
-    return book_entry.get('added_by') == username
+    return book[book_entry].get('added_by') == username
 def error_response(message, status_code):
     return jsonify({'message': message}), status_code
 dir_name = Path(__file__).resolve().parent.parent
@@ -143,7 +143,7 @@ def update_book(book_id):
     elif not check_data(data,required):
         logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('The data content not has all the required fields!', 400)
-    if not is_owner(book_id,get_jwt_identity()):
+    if not is_owner(str(book_id),get_jwt_identity()):
         logger.warning(f'{get_jwt_identity()} is not the owner {request.path}')
         error_response('You are not authorized!', 403)
     if data['rating'] < 0 or data['rating'] > 5:
@@ -167,7 +167,10 @@ def update_book(book_id):
             i['added_at'] = datetime.now().strftime('%Y-%m-%d')
             i['added_by'] = get_jwt_identity()
             new_book = i
-    if new_book is None:
+    if not is_owner(i,get_jwt_identity()):
+        logger.warning(f'{get_jwt_identity()} is not the owner {request.path}')
+        error_response('You are not authorized!', 403)
+    elif new_book is None:
         logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('book_id not found!', 404)
     book[str(new_book['book_id'])] = new_book
