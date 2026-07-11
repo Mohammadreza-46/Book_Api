@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -41,7 +42,7 @@ def flask_server():
     env["JWT_SECRET_KEY"] = TEST_JWT_SECRET
 
     proc = subprocess.Popen(
-        ["python3", "main.py"],
+        [sys.executable, "main.py"],
         cwd=str(PROJECT_DIR),
         env=env,
         stdout=subprocess.DEVNULL,

@@ -91,6 +91,31 @@ class TestSignup:
         assert stored["password"] != "PlainPassword1"
         assert stored["password"].startswith("$2b$")
 
+    def test_username_with_underscores_is_accepted(self):
+        r = register("valid_user_1")
+        assert r.status_code == 200
+
+    def test_username_all_spaces_returns_400(self):
+        r = requests.post(f"{BASE_URL}/signup", json={"username": "        ", "password": "Password123"})
+        assert r.status_code == 400
+
+    def test_signup_response_does_not_leak_password(self):
+        username = unique_user()
+        r = register(username)
+        assert "password" not in r.json()
+
+    def test_list_password_returns_400(self):
+        # BUG: a non-string password reaches check_data, which calls .strip()
+        # on it and raises AttributeError -> HTTP 500 instead of 400 (#24/#27).
+        r = requests.post(f"{BASE_URL}/signup", json={"username": unique_user(), "password": ["a", "b"]})
+        assert r.status_code == 400  # BUG: returns 500
+
+    def test_registered_user_can_immediately_log_in(self):
+        username = unique_user()
+        register(username, "GoodPass123")
+        r = login(username, "GoodPass123")
+        assert r.status_code == 200
+
 
 class TestLogin:
 
@@ -154,6 +179,40 @@ class TestLogin:
         token1 = login(username).json()["token"]
         token2 = login(username).json()["token"]
         assert token1 != token2
+
+    def test_integer_password_returns_400(self):
+        # BUG: login calls check_data before its isinstance guard; check_data
+        # does password.strip() on the int -> AttributeError -> HTTP 500 (#24).
+        username = unique_user()
+        register(username)
+        r = requests.post(f"{BASE_URL}/login", json={"username": username, "password": 12345678})
+        assert r.status_code == 400  # BUG: returns 500
+
+    def test_null_password_returns_400(self):
+        # BUG: same crash path as above with a null password (#24).
+        username = unique_user()
+        register(username)
+        r = requests.post(f"{BASE_URL}/login", json={"username": username, "password": None})
+        assert r.status_code == 400  # BUG: returns 500
+
+    def test_login_username_is_case_sensitive(self):
+        username = "casetest_" + unique_user()[-6:]
+        register(username, "Password123")
+        r = login(username.upper(), "Password123")
+        assert r.status_code == 400
+
+    def test_correct_password_after_wrong_attempt_still_works(self):
+        username = unique_user()
+        register(username, "RightPass1")
+        login(username, "WrongPass1")
+        r = login(username, "RightPass1")
+        assert r.status_code == 200
+
+    def test_refresh_token_is_returned_and_non_empty(self):
+        username = unique_user()
+        register(username)
+        rt = login(username).json().get("refresh_token", "")
+        assert isinstance(rt, str) and len(rt) > 10
 
 
 class TestRefreshToken:

@@ -93,3 +93,104 @@ class TestCheckDataNl:
 
     def test_returns_true_with_third_field_only(self):
         assert check_data_nl({"writer": "Tolkien"}, self.OPTIONAL) is True
+
+
+class TestCheckDataEdgeCases:
+    """
+    Extra edge cases for check_data — type coercion, empty/whitespace strings,
+    and the non-string-value crash that powers issues #24 and #27.
+    """
+
+    FIELDS = [("name", str), ("age", int), ("active", bool)]
+
+    def test_float_for_int_field_returns_false(self):
+        data = {"name": "Alice", "age": 30.5, "active": True}
+        assert check_data(data, self.FIELDS) is False
+
+    def test_zero_is_a_valid_int(self):
+        data = {"name": "Alice", "age": 0, "active": True}
+        assert check_data(data, self.FIELDS) is True
+
+    def test_negative_int_is_valid_no_range_check(self):
+        # check_data only validates presence + type, never a numeric range.
+        data = {"name": "Alice", "age": -99, "active": True}
+        assert check_data(data, self.FIELDS) is True
+
+    def test_none_when_int_expected_returns_false(self):
+        data = {"name": "Alice", "age": None, "active": True}
+        assert check_data(data, self.FIELDS) is False
+
+    def test_empty_string_for_str_field_is_currently_accepted(self):
+        # KNOWN BUG (#27): the empty-string guard sits inside the
+        # `if not isinstance(...)` branch, so it is unreachable for real
+        # strings. An empty string therefore passes check_data.
+        # This SHOULD return False.
+        data = {"name": "", "age": 30, "active": True}
+        assert check_data(data, self.FIELDS) is True
+
+    def test_whitespace_only_string_is_currently_accepted(self):
+        # KNOWN BUG (#27): same misplaced guard — "   " passes.
+        data = {"name": "   ", "age": 30, "active": True}
+        assert check_data(data, self.FIELDS) is True
+
+    def test_int_for_str_field_raises_attributeerror(self):
+        # KNOWN BUG (#24): when a str field gets a non-string, check_data
+        # calls `.strip()` on it and raises AttributeError -> HTTP 500,
+        # instead of cleanly returning False.
+        data = {"name": 123, "age": 30, "active": True}
+        with pytest.raises(AttributeError):
+            check_data(data, self.FIELDS)
+
+    def test_list_for_str_field_raises_attributeerror(self):
+        # KNOWN BUG (#24): same crash path with a list value.
+        data = {"name": ["x"], "age": 30, "active": True}
+        with pytest.raises(AttributeError):
+            check_data(data, self.FIELDS)
+
+    def test_all_fields_present_and_correct_with_many_fields(self):
+        fields = [("a", str), ("b", int), ("c", str), ("d", int)]
+        data = {"a": "x", "b": 1, "c": "y", "d": 2}
+        assert check_data(data, fields) is True
+
+    def test_first_field_wrong_short_circuits_to_false(self):
+        fields = [("a", str), ("b", int)]
+        data = {"a": "ok", "b": "not-an-int"}
+        assert check_data(data, fields) is False
+
+
+class TestCheckDataNlEdgeCases:
+    """
+    Extra edge cases for check_data_nl. Unlike check_data, its empty-string
+    guard IS reachable, so it safely rejects empty/whitespace/non-string
+    values without crashing — this is what makes empty-search return 400.
+    """
+
+    OPTIONAL = [("book_name", str), ("genre", str), ("writer", str)]
+
+    def test_empty_string_field_is_skipped(self):
+        # Powers issue #27: empty search must NOT match everything.
+        assert check_data_nl({"book_name": ""}, self.OPTIONAL) is False
+
+    def test_whitespace_only_field_is_skipped(self):
+        assert check_data_nl({"book_name": "   "}, self.OPTIONAL) is False
+
+    def test_all_empty_strings_returns_false(self):
+        data = {"book_name": "", "genre": "   ", "writer": ""}
+        assert check_data_nl(data, self.OPTIONAL) is False
+
+    def test_valid_field_plus_empty_field_returns_true(self):
+        data = {"book_name": "Dune", "genre": ""}
+        assert check_data_nl(data, self.OPTIONAL) is True
+
+    def test_non_string_value_does_not_crash_and_returns_false(self):
+        # Contrast with check_data: check_data_nl guards with isinstance
+        # BEFORE touching .strip(), so a non-string is simply ignored.
+        assert check_data_nl({"book_name": 123}, self.OPTIONAL) is False
+
+    def test_non_string_value_plus_valid_value_returns_true(self):
+        data = {"book_name": 123, "writer": "Tolkien"}
+        assert check_data_nl(data, self.OPTIONAL) is True
+
+    def test_empty_required_list_returns_false(self):
+        # No fields to match against -> nothing found.
+        assert check_data_nl({"book_name": "Dune"}, []) is False

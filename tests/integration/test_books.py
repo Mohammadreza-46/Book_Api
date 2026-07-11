@@ -4,6 +4,8 @@ Integration tests for all book endpoints.
 Tests marked with # BUG are expected to FAIL because of known bugs in the code.
 These tests exist specifically to expose those bugs.
 """
+from datetime import datetime
+
 import pytest
 import requests
 from tests.conftest import (
@@ -68,6 +70,38 @@ class TestGetAllBook:
         tokens = register_and_login(unique_user())
         r = requests.get(f"{BASE_URL}/get_all_book?page=-1&per_page=10", headers=auth_headers(tokens["token"]))
         assert r.status_code == 200
+
+    def test_per_page_zero_returns_empty_list(self):
+        tokens = register_and_login(unique_user())
+        h = auth_headers(tokens["token"])
+        requests.post(f"{BASE_URL}/add_book", json=make_book(unique_book_id()), headers=h)
+        r = requests.get(f"{BASE_URL}/get_all_book?per_page=0", headers=h)
+        assert r.status_code == 200
+        assert r.json()["book"] == []
+
+    def test_default_page_returns_at_most_10(self):
+        tokens = register_and_login(unique_user())
+        r = requests.get(f"{BASE_URL}/get_all_book", headers=auth_headers(tokens["token"]))
+        assert r.status_code == 200
+        assert len(r.json()["book"]) <= 10
+
+    def test_page_zero_is_treated_as_page_one(self):
+        tokens = register_and_login(unique_user())
+        h = auth_headers(tokens["token"])
+        requests.post(f"{BASE_URL}/add_book", json=make_book(unique_book_id()), headers=h)
+        page0 = requests.get(f"{BASE_URL}/get_all_book?page=0&per_page=5", headers=h).json()["book"]
+        page1 = requests.get(f"{BASE_URL}/get_all_book?page=1&per_page=5", headers=h).json()["book"]
+        assert page0 == page1
+
+    def test_large_per_page_returns_all_added_books(self):
+        tokens = register_and_login(unique_user())
+        h = auth_headers(tokens["token"])
+        ids = [unique_book_id() for _ in range(3)]
+        for bid in ids:
+            requests.post(f"{BASE_URL}/add_book", json=make_book(bid), headers=h)
+        r = requests.get(f"{BASE_URL}/get_all_book?per_page=100000", headers=h)
+        returned = {b["book_id"] for b in r.json()["book"]}
+        assert set(ids).issubset(returned)
 
 
 class TestAddBook:
@@ -166,6 +200,81 @@ class TestAddBook:
         r2 = requests.post(f"{BASE_URL}/add_book", json=make_book(bid2), headers=auth_headers(tokens2["token"]))
         assert r1.status_code == 201
         assert r2.status_code == 201
+
+    # --- rating / published_year range validation (issue #31) ---
+
+    def test_rating_below_range_returns_400(self):
+        tokens = register_and_login(unique_user())
+        book = make_book(unique_book_id(), rating=-1)
+        r = requests.post(f"{BASE_URL}/add_book", json=book, headers=auth_headers(tokens["token"]))
+        assert r.status_code == 400
+
+    def test_rating_above_range_returns_400(self):
+        tokens = register_and_login(unique_user())
+        book = make_book(unique_book_id(), rating=6)
+        r = requests.post(f"{BASE_URL}/add_book", json=book, headers=auth_headers(tokens["token"]))
+        assert r.status_code == 400
+
+    def test_rating_far_above_range_returns_400(self):
+        tokens = register_and_login(unique_user())
+        book = make_book(unique_book_id(), rating=99999)
+        r = requests.post(f"{BASE_URL}/add_book", json=book, headers=auth_headers(tokens["token"]))
+        assert r.status_code == 400
+
+    def test_rating_boundary_0_is_accepted(self):
+        tokens = register_and_login(unique_user())
+        book = make_book(unique_book_id(), rating=0)
+        r = requests.post(f"{BASE_URL}/add_book", json=book, headers=auth_headers(tokens["token"]))
+        assert r.status_code == 201
+
+    def test_rating_boundary_5_is_accepted(self):
+        tokens = register_and_login(unique_user())
+        book = make_book(unique_book_id(), rating=5)
+        r = requests.post(f"{BASE_URL}/add_book", json=book, headers=auth_headers(tokens["token"]))
+        assert r.status_code == 201
+
+    def test_negative_published_year_returns_400(self):
+        tokens = register_and_login(unique_user())
+        book = make_book(unique_book_id(), published_year=-99)
+        r = requests.post(f"{BASE_URL}/add_book", json=book, headers=auth_headers(tokens["token"]))
+        assert r.status_code == 400
+
+    def test_future_published_year_returns_400(self):
+        tokens = register_and_login(unique_user())
+        book = make_book(unique_book_id(), published_year=99999)
+        r = requests.post(f"{BASE_URL}/add_book", json=book, headers=auth_headers(tokens["token"]))
+        assert r.status_code == 400
+
+    def test_current_published_year_is_accepted(self):
+        tokens = register_and_login(unique_user())
+        book = make_book(unique_book_id(), published_year=datetime.today().year)
+        r = requests.post(f"{BASE_URL}/add_book", json=book, headers=auth_headers(tokens["token"]))
+        assert r.status_code == 201
+
+    # --- empty / whitespace string fields ---
+
+    def test_empty_book_name_returns_400(self):
+        # BUG: check_data's empty-string guard is unreachable for real strings,
+        # so an empty book_name is accepted and the book is created (201). (#27)
+        tokens = register_and_login(unique_user())
+        book = make_book(unique_book_id(), book_name="")
+        r = requests.post(f"{BASE_URL}/add_book", json=book, headers=auth_headers(tokens["token"]))
+        assert r.status_code == 400  # BUG: returns 201
+
+    def test_whitespace_only_book_name_returns_400(self):
+        # BUG: same as above — "   " passes check_data and is stored. (#27)
+        tokens = register_and_login(unique_user())
+        book = make_book(unique_book_id(), book_name="   ")
+        r = requests.post(f"{BASE_URL}/add_book", json=book, headers=auth_headers(tokens["token"]))
+        assert r.status_code == 400  # BUG: returns 201
+
+    def test_non_string_genre_returns_400(self):
+        # BUG: a non-string value for a str field crashes check_data
+        # (.strip() on a non-str -> AttributeError -> 500). (#24)
+        tokens = register_and_login(unique_user())
+        book = make_book(unique_book_id(), genre=123)
+        r = requests.post(f"{BASE_URL}/add_book", json=book, headers=auth_headers(tokens["token"]))
+        assert r.status_code == 400  # BUG: returns 500
 
 
 class TestGetBook:
@@ -367,6 +476,30 @@ class TestUpdateBook:
         r = requests.put(f"{BASE_URL}/update_book/{bid}", json=make_book(bid), headers=h)
         assert r.status_code == 405
 
+    def test_update_with_rating_out_of_range_returns_400(self):
+        tokens = register_and_login(unique_user())
+        bid = unique_book_id()
+        h = auth_headers(tokens["token"])
+        requests.post(f"{BASE_URL}/add_book", json=make_book(bid), headers=h)
+        r = requests.post(f"{BASE_URL}/update_book/{bid}", json=make_book(bid, rating=99), headers=h)
+        assert r.status_code == 400
+
+    def test_update_with_future_year_returns_400(self):
+        tokens = register_and_login(unique_user())
+        bid = unique_book_id()
+        h = auth_headers(tokens["token"])
+        requests.post(f"{BASE_URL}/add_book", json=make_book(bid), headers=h)
+        r = requests.post(f"{BASE_URL}/update_book/{bid}", json=make_book(bid, published_year=99999), headers=h)
+        assert r.status_code == 400
+
+    def test_update_no_body_returns_400_or_415(self):
+        tokens = register_and_login(unique_user())
+        bid = unique_book_id()
+        h = auth_headers(tokens["token"])
+        requests.post(f"{BASE_URL}/add_book", json=make_book(bid), headers=h)
+        r = requests.post(f"{BASE_URL}/update_book/{bid}", headers=h)
+        assert r.status_code in (400, 415)
+
 
 class TestSearch:
 
@@ -452,3 +585,101 @@ class TestSearch:
         r = requests.post(f"{BASE_URL}/search", json={"book_name": "anything"}, headers=auth_headers(tokens["token"]))
         assert r.status_code == 200
         assert isinstance(r.json(), list)
+
+    def test_empty_string_search_returns_400_not_all_books(self):
+        # Regression guard for issue #27: an empty query must not match everything.
+        tokens = register_and_login(unique_user())
+        r = requests.post(f"{BASE_URL}/search", json={"book_name": ""}, headers=auth_headers(tokens["token"]))
+        assert r.status_code == 400
+
+    def test_whitespace_only_search_returns_400(self):
+        tokens = register_and_login(unique_user())
+        r = requests.post(f"{BASE_URL}/search", json={"book_name": "   "}, headers=auth_headers(tokens["token"]))
+        assert r.status_code == 400
+
+    def test_non_string_search_value_returns_400(self):
+        tokens = register_and_login(unique_user())
+        r = requests.post(f"{BASE_URL}/search", json={"book_name": 12345}, headers=auth_headers(tokens["token"]))
+        assert r.status_code == 400
+
+    def test_multi_field_search_still_matches_first_field(self):
+        # Regression guard for issue #26: the field checks are independent
+        # `if`s, not an elif chain, so a match on book_name is not lost just
+        # because a second field is also provided.
+        tokens = register_and_login(unique_user())
+        h = auth_headers(tokens["token"])
+        bid = unique_book_id()
+        requests.post(f"{BASE_URL}/add_book", json=make_book(bid, book_name="Zephyr Chronicle"), headers=h)
+        r = requests.post(
+            f"{BASE_URL}/search",
+            json={"book_name": "Zephyr Chronicle", "genre": "NoSuchGenreXYZ"},
+            headers=h,
+        )
+        assert r.status_code == 200
+        assert any(b["book_id"] == bid for b in r.json())
+
+    def test_search_by_partial_genre_returns_match(self):
+        tokens = register_and_login(unique_user())
+        h = auth_headers(tokens["token"])
+        bid = unique_book_id()
+        requests.post(f"{BASE_URL}/add_book", json=make_book(bid, genre="Historical Fiction ZZZ"), headers=h)
+        r = requests.post(f"{BASE_URL}/search", json={"genre": "Historical"}, headers=h)
+        assert r.status_code == 200
+        assert any(b["book_id"] == bid for b in r.json())
+
+    def test_search_only_returns_books_matching_the_query(self):
+        tokens = register_and_login(unique_user())
+        h = auth_headers(tokens["token"])
+        match_id, other_id = unique_book_id(), unique_book_id()
+        requests.post(f"{BASE_URL}/add_book", json=make_book(match_id, writer="Distinctive Writer QQQ"), headers=h)
+        requests.post(f"{BASE_URL}/add_book", json=make_book(other_id, writer="Someone Else"), headers=h)
+        results = requests.post(f"{BASE_URL}/search", json={"writer": "Distinctive Writer QQQ"}, headers=h).json()
+        returned_ids = {b["book_id"] for b in results}
+        assert match_id in returned_ids
+        assert other_id not in returned_ids
+
+
+class TestBookLifecycle:
+    """End-to-end flows that chain multiple endpoints together."""
+
+    def test_add_then_get_then_search_flow(self):
+        username = unique_user()
+        tokens = register_and_login(username)
+        h = auth_headers(tokens["token"])
+        bid = unique_book_id()
+
+        # add
+        r_add = requests.post(f"{BASE_URL}/add_book", json=make_book(bid, book_name="Lifecycle Book AAA"), headers=h)
+        assert r_add.status_code == 201
+
+        # get_book reflects it
+        r_get = requests.get(f"{BASE_URL}/get_book/{bid}", headers=h)
+        assert r_get.status_code == 200
+        assert r_get.json()["book_name"] == "Lifecycle Book AAA"
+        assert r_get.json()["added_by"] == username
+
+        # it appears in get_all_book
+        all_ids = {b["book_id"] for b in requests.get(f"{BASE_URL}/get_all_book?per_page=100000", headers=h).json()["book"]}
+        assert bid in all_ids
+
+        # and it is searchable
+        found = requests.post(f"{BASE_URL}/search", json={"book_name": "Lifecycle Book AAA"}, headers=h).json()
+        assert any(b["book_id"] == bid for b in found)
+
+    def test_added_book_is_owned_by_creator_only(self):
+        owner = register_and_login(unique_user())
+        stranger = register_and_login(unique_user())
+        bid = unique_book_id()
+        requests.post(f"{BASE_URL}/add_book", json=make_book(bid), headers=auth_headers(owner["token"]))
+
+        # both can read
+        assert requests.get(f"{BASE_URL}/get_book/{bid}", headers=auth_headers(owner["token"])).status_code == 200
+        assert requests.get(f"{BASE_URL}/get_book/{bid}", headers=auth_headers(stranger["token"])).status_code == 200
+
+        # a stranger must NOT be able to hijack the book
+        r = requests.post(
+            f"{BASE_URL}/update_book/{bid}",
+            json=make_book(bid, book_name="Hijacked"),
+            headers=auth_headers(stranger["token"]),
+        )
+        assert r.status_code in (403, 404)  # BUG (#33): currently returns 500
