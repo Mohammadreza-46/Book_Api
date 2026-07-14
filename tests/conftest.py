@@ -4,9 +4,9 @@ import sys
 import time
 import uuid
 from pathlib import Path
-
 import pytest
 import requests
+import sys
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_DIR / "data"
@@ -43,10 +43,8 @@ def flask_server():
 
     proc = subprocess.Popen(
         [sys.executable, "main.py"],
-        cwd=str(PROJECT_DIR),
-        env=env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        cwd=str(PROJECT_DIR), env=env,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
 
     if not _wait_for_server():
