@@ -167,7 +167,7 @@ def update_book(book_id):
             i['added_at'] = datetime.now().strftime('%Y-%m-%d')
             i['added_by'] = get_jwt_identity()
             new_book = i
-    if not is_owner(book[i]mak,get_jwt_identity()):
+    if not is_owner(book[i],get_jwt_identity()):
         logger.warning(f'{get_jwt_identity()} is not the owner {request.path}')
         error_response('You are not authorized!', 403)
     elif new_book is None:
