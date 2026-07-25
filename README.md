@@ -5,7 +5,7 @@
 ![JWT](https://img.shields.io/badge/Auth-JWT-green)
 ![License](https://img.shields.io/badge/License-MIT-orange)
 
-A REST API built with Flask for managing a book collection. Supports user authentication via JWT, full CRUD operations on books, and file-based storage.
+A REST API for managing a book collection, built with Flask. It provides JWT-based authentication, full CRUD operations on books, and simple file-based storage — with no external database required. The project runs the same way on Linux, macOS, and Windows.
 
 ---
 
@@ -41,21 +41,23 @@ A REST API built with Flask for managing a book collection. Supports user authen
 Book_Api/
 ├── app/
 │   ├── __init__.py
-│   ├── auth.py          # signup, login, refresh token
-│   └── books.py         # book CRUD and search
+│   ├── auth.py               # signup, login, refresh token
+│   ├── books.py              # book CRUD and search
+│   └── check_data.py         # request-body validation
 ├── data/
-│   ├── Book_Loader.json # book storage
-│   └── Users/           # one JSON file per user
+│   ├── Book_Loader.json      # book storage
+│   └── Users/                # one JSON file per user
 ├── tests/
-│   ├── conftest.py
-│   ├── unit/
-│   │   └── test_check_data.py
-│   └── integration/
+│   ├── conftest.py           # shared fixtures + test server
+│   ├── unit/                 # fast, in-process tests
+│   │   ├── test_check_data.py
+│   │   ├── test_auth_helpers.py
+│   │   └── test_books_helpers.py
+│   └── integration/          # end-to-end tests against a live server
 │       ├── test_auth.py
 │       └── test_books.py
-├── check_data.py
-├── main.py
-├── Makefile
+├── main.py                   # application entry point
+├── Makefile                  # cross-platform dev commands
 ├── requirements.txt
 └── .env.example
 ```
@@ -64,43 +66,48 @@ Book_Api/
 
 ## Getting Started
 
+### Prerequisites
+
+- **Python 3.10 or newer**
+- **GNU Make** — preinstalled on most Linux/macOS systems. On Windows, install it once with any of:
+  ```
+  winget install ezwinports.make      # or
+  choco install make                  # or
+  scoop install make
+  ```
+  The `make` targets then work identically from cmd, PowerShell, or a Unix shell.
+
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/Mohammadreza-46/book_api.git
+git clone https://github.com/Mohammadreza-46/Book_Api.git
 cd Book_Api
 ```
 
-### 2. Set up environment variables
+### 2. Configure the secret key
 
 ```bash
-cp .env.example .env
+cp .env.example .env      # Windows: copy .env.example .env
 ```
 
-Edit `.env` and set a strong secret key:
+Then open `.env` and set a long, random value. **`JWT_SECRET_KEY` must be at least 32 characters** — the server refuses to start otherwise:
 
 ```
-JWT_SECRET_KEY=your-long-random-secret-key-here
+JWT_SECRET_KEY=your-long-random-secret-key-at-least-32-chars
 ```
 
-### 3. Install dependencies and create virtualenv
+### 3. Install dependencies
 
 ```bash
 make setup
 ```
 
-Or manually:
+This creates a virtual environment in `venv/` and installs everything from `requirements.txt`. To do it by hand:
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate      # Windows: venv\Scripts\activate
+python3 -m venv venv                # Windows: python -m venv venv
+source venv/bin/activate            # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-```
-
-### 4. Create required directories
-
-```bash
-mkdir -p data/Users
 ```
 
 ---
@@ -109,7 +116,7 @@ mkdir -p data/Users
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `JWT_SECRET_KEY` | Yes | Secret key used to sign JWT tokens. Must be long and random. |
+| `JWT_SECRET_KEY` | Yes | Secret used to sign JWT tokens. Must be a long, random string of **at least 32 characters**. |
 
 ---
 
@@ -119,25 +126,33 @@ mkdir -p data/Users
 make run
 ```
 
-Or manually:
+`make run` creates the required data directories, loads `JWT_SECRET_KEY` from your environment (falling back to an insecure dev default if it is unset), and starts the server. To run it manually with your own secret:
 
 ```bash
-JWT_SECRET_KEY=your-secret python3 main.py
+# Linux / macOS
+JWT_SECRET_KEY=your-long-random-secret python3 main.py
+
+# Windows (PowerShell)
+$env:JWT_SECRET_KEY="your-long-random-secret"; python main.py
 ```
 
-Server runs at:
+The server listens at:
 
 ```
 http://localhost:5000
 ```
 
+Stop it with `Ctrl+C`, or `make stop` from another terminal.
+
 ---
 
 ## Running Tests
 
+The test suite runs the same on every platform — unit tests execute in-process, and integration tests boot a real server on port 5000 automatically (no manual setup needed).
+
 ```bash
-make check          # run all tests
-make test-unit      # unit tests only
+make test              # run everything (unit + integration)
+make test-unit         # unit tests only
 make test-integration  # integration tests only
 ```
 
