@@ -7,6 +7,7 @@ from pathlib import Path
 from app.check_data import check_data, check_data_nl
 from app.extensions import db
 from flask_migrate import Migrate
+from app import models
 
 app = Flask(__name__)
 books_bp = books.books_bp
