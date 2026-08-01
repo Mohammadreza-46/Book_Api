@@ -47,45 +47,28 @@ class TestErrorResponse:
 
 class TestIsOwner:
     """
-    is_owner is defined as `book[book_entry].get('added_by') == username`,
-    i.e. it expects a dict KEY and indexes the module-level `book` itself.
-    These tests pin that contract and document the crashes that happen when
-    callers break it (issue #33).
+    is_owner takes a book ENTRY (a dict) and checks its 'added_by' field:
+    `book_entry.get('added_by') == username`. It never indexes the module
+    dict itself, so it cannot crash on a missing id — that keeps update_book
+    and delete_book able to return a clean 403/404 (issues #21 / #33).
     """
 
-    def setup_method(self):
-        self._original = books.book
-        books.book = {
-            "1": {"book_id": 1, "added_by": "alice"},
-            "2": {"book_id": 2, "added_by": "bob"},
-        }
+    ALICE_BOOK = {"book_id": 1, "added_by": "alice"}
+    BOB_BOOK = {"book_id": 2, "added_by": "bob"}
 
-    def teardown_method(self):
-        books.book = self._original
+    def test_true_when_owner_matches(self):
+        assert books.is_owner(self.ALICE_BOOK, "alice") is True
 
-    def test_true_when_key_owner_matches(self):
-        assert books.is_owner("1", "alice") is True
-
-    def test_false_when_key_owner_differs(self):
-        assert books.is_owner("1", "bob") is False
+    def test_false_when_owner_differs(self):
+        assert books.is_owner(self.ALICE_BOOK, "bob") is False
 
     def test_false_for_unknown_username(self):
-        assert books.is_owner("2", "carol") is False
+        assert books.is_owner(self.BOB_BOOK, "carol") is False
 
-    def test_missing_key_raises_keyerror_known_bug(self):
-        # KNOWN BUG (#33): update_book calls is_owner(str(book_id)) without
-        # first checking the book exists, so a non-existent id does
-        # book['9999'] -> KeyError -> HTTP 500 instead of a clean 404.
-        with pytest.raises(KeyError):
-            books.is_owner("9999", "alice")
-
-    def test_passing_entry_instead_of_key_raises_typeerror_known_bug(self):
-        # KNOWN BUG (#33): delete_book and update_book pass the book ENTRY
-        # (a dict) instead of the key, so is_owner does book[<dict>] ->
-        # TypeError: unhashable type -> HTTP 500.
-        entry = books.book["1"]
-        with pytest.raises(TypeError):
-            books.is_owner(entry, "alice")
+    def test_false_when_entry_has_no_added_by(self):
+        # A malformed entry without 'added_by' is simply not owned by anyone,
+        # rather than raising — .get() returns None, which never equals a name.
+        assert books.is_owner({"book_id": 3}, "alice") is False
 
 
 class TestLoadSaveBooks:

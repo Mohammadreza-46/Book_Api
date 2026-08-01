@@ -9,7 +9,7 @@ venv/
 .venv/
 env/
 ENV/
-
+.mypy_cache
 
 # Distribution / packaging
 build/

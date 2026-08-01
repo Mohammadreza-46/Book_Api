@@ -32,4 +32,10 @@ app.config['JWT_SECRET_KEY'] = secret
 app.register_blueprint(books_bp)
 app.register_blueprint(auth_bp)
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # The auto-reloader spawns a second process that actually holds the port.
+    # For the test harness (and any scripted run) that makes a clean shutdown
+    # unreliable — terminating the parent can leave an orphan holding port 5000,
+    # which is especially likely on Windows. Set USE_RELOADER=0 to run a single
+    # process that stops cleanly with a plain terminate().
+    use_reloader = os.environ.get('USE_RELOADER', '1') != '0'
+    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=use_reloader)
