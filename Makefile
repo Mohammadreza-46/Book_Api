@@ -8,7 +8,7 @@
 # is done through Python one-liners instead of shell built-ins, so the exact
 # shell (sh vs cmd.exe) does not matter.
 
-VENV = venv
+VENV = .venv
 
 ifeq ($(OS),Windows_NT)
     PYTHON := python
