@@ -138,42 +138,40 @@ def update_book(book_id):
         , ('genre', str),
         ('created_at', str)
     ]
-    if check_data(data,required):
-        pass
-    elif not check_data(data,required):
+    if not check_data(data, required):
         logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('The data content not has all the required fields!', 400)
-    if not is_owner(book[str(book_id)],get_jwt_identity()):
+
+    key = str(book_id)
+    if key not in book:
+        logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
+        return error_response('book_id not found!', 404)
+
+    if not is_owner(book[key], get_jwt_identity()):
         logger.warning(f'{get_jwt_identity()} is not the owner {request.path}')
-        error_response('You are not authorized!', 403)
+        return error_response('You are not authorized!', 403)
+
     if data['rating'] < 0 or data['rating'] > 5:
-        logger.warning(f"{get_jwt_identity} sent invalid data to {request.path}")
-        return error_response('the rating is out of the range(0/5)',400)
+        logger.warning(f"{get_jwt_identity()} sent invalid data to {request.path}")
+        return error_response('the rating is out of the range(0/5)', 400)
     curent_year = datetime.today().year
     if data['published_year'] < 0 or data['published_year'] > curent_year:
         logger.warning(f"{get_jwt_identity()} sent invalid data to {request.path}")
-        return error_response(f'the published_year is out of the range(0/{curent_year})',400)
-    new_book = None
-    for i in book.values():
-        if i['book_id'] == book_id and is_owner(i,get_jwt_identity()):
-            i['book_name'] = data['book_name']
-            i['book_content'] = data['book_content']
-            i['book_id'] = book_id
-            i['writer'] = data['writer']
-            i['published_year'] = data['published_year']
-            i['rating'] = data['rating']
-            i['genre'] = data['genre']
-            i['created_at'] = data['created_at']
-            i['added_at'] = datetime.now().strftime('%Y-%m-%d')
-            i['added_by'] = get_jwt_identity()
-            new_book = i
-    if not is_owner(book[i],get_jwt_identity()):
-        logger.warning(f'{get_jwt_identity()} is not the owner {request.path}')
-        error_response('You are not authorized!', 403)
-    elif new_book is None:
-        logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
-        return error_response('book_id not found!', 404)
-    book[str(new_book['book_id'])] = new_book
+        return error_response(f'the published_year is out of the range(0/{curent_year})', 400)
+
+    entry = book[key]
+    entry['book_name'] = data['book_name']
+    entry['book_content'] = data['book_content']
+    entry['book_id'] = book_id
+    entry['writer'] = data['writer']
+    entry['published_year'] = data['published_year']
+    entry['rating'] = data['rating']
+    entry['genre'] = data['genre']
+    entry['created_at'] = data['created_at']
+    entry['added_at'] = datetime.now().strftime('%Y-%m-%d')
+    entry['added_by'] = get_jwt_identity()
+
+    book[key] = entry
     save_books(book)
     logger.info(f'{get_jwt_identity()} updated book {book_id}')
     return jsonify({'Success': 'Book updated'}), 200
