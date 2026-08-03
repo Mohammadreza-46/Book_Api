@@ -13,6 +13,7 @@ from app.models import User
 
 def error_response(message, status_code):
     return jsonify({'message': message}), status_code
+
 file = Path(__file__).resolve()
 dir_name = file.parent.parent
 
@@ -51,7 +52,7 @@ def signup():
     if existing is not None:
         return error_response('username already exists', 409)
     hashed = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
-    user = User(username=data['username'], password=hashed)
+    user = User(username=data['username'].strip(), password=hashed)
     db.session.add(user)
     db.session.commit()
     return jsonify({'message': 'success'})
@@ -59,12 +60,12 @@ def signup():
 @auth_bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
-    user = db.session.scalar(db.select(User).filter_by(username=data['username']))
+    user = db.session.scalar(db.select(User).filter_by(username=data['username'].strip()))
     if user is None:
         return error_response('username and password do not match', 400)
 
     plain = data['password'].encode('utf-8')
-    if bcrypt.checkpw(plain, user.password.decode('utf-8')):
+    if bcrypt.checkpw(plain, user.password.encode('utf-8')):
         token = make_token(user.username)
         refresh_token = make_refresh_token(user.username)
         logger.info(f"{user.username} loged!")
