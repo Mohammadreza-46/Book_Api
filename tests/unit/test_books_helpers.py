@@ -100,3 +100,19 @@ class TestLoadSaveBooks:
     def test_load_empty_file_returns_empty_dict(self, tmp_path, monkeypatch):
         self._point_to_temp(tmp_path, monkeypatch)
         assert books.load_books() == {}
+
+    def test_roundtrip_preserves_non_ascii_text(self, tmp_path, monkeypatch):
+        # Persian/Unicode book data must survive save -> load unchanged.
+        # load_books/save_books open files with encoding='utf-8'; without that,
+        # Windows would fall back to the locale codepage and corrupt or crash.
+        self._point_to_temp(tmp_path, monkeypatch)
+        data = {
+            "1": {
+                "book_id": 1,
+                "book_name": "کتاب فارسی",
+                "writer": "نویسنده",
+                "book_content": "متنِ نمونه با emoji 📚",
+            }
+        }
+        books.save_books(data)
+        assert books.load_books() == data

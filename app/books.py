@@ -17,12 +17,12 @@ dir_name = Path(__file__).resolve().parent.parent
 BOOKS_FILE = os.path.join(dir_name, 'data', 'Book_Loader.json')
 
 def load_books() -> dict:
-    with open(BOOKS_FILE) as f:
+    with open(BOOKS_FILE, encoding='utf-8') as f:
         return json.load(f)
 
 def save_books(books: dict) -> None:
     tmp_path = BOOKS_FILE + '.tmp'
-    with open(tmp_path, 'w') as f:
+    with open(tmp_path, 'w', encoding='utf-8') as f:
         json.dump(books, f)
     os.replace(tmp_path, BOOKS_FILE)
 
