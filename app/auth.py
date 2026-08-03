@@ -8,6 +8,8 @@ from flask_jwt_extended import create_access_token, create_refresh_token,jwt_req
 import datetime
 from pathlib import Path
 import re
+from app.extensions import db
+from app.models import User
 
 def error_response(message, status_code):
     return jsonify({'message': message}), status_code
@@ -45,40 +47,30 @@ def signup():
         return error_response('Username can only contain letters, numbers, and underscores',400)
     if not isinstance(data.get('username'), str) or not isinstance(data.get('password'), str):
         return error_response('username and password must be strings', 400)
-    data['password'] = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
-    users_dir = os.path.join(dir_name, 'data', 'Users')
-    os.makedirs(users_dir, exist_ok=True)
-    file_name = os.path.join(users_dir, data['username']) + '.json'
-    if os.path.exists(file_name):
-        return error_response('username already exists',409)
-    with open(file_name, 'w', encoding='utf-8') as f:
-        f.write(json.dumps(data))
+    existing = db.session.scalar(db.select(User).filter_by(username=data['username']))
+    if existing is not None:
+        return error_response('username already exists', 409)
+    hashed = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
+    user = User(username=data['username'], password=hashed)
+    db.session.add(user)
+    db.session.commit()
     return jsonify({'message': 'success'})
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
-    required = [('username',str),('password',str)]
-    if not check_data(data,required):
-        return error_response('data is none',400)
-    if not isinstance(data.get('username'), str) or not isinstance(data.get('password'), str):
-        return error_response('username and password must be strings', 400)
+    user = db.session.scalar(db.select(User).filter_by(username=data['username']))
+    if user is None:
+        return error_response('username and password do not match', 400)
+
     plain = data['password'].encode('utf-8')
-    try:
-        file_name = os.path.join(dir_name, 'data', 'Users', data['username']) + '.json'
-        with open(file_name, 'r', encoding='utf-8') as f:
-            json_data = json.loads(f.read())
-            stored = json_data['password'].encode('utf-8')
-            if bcrypt.checkpw(plain, stored) and json_data['username'] == data['username']:
-                token = make_token(json_data['username'])
-                refresh_token = make_refresh_token(json_data['username'])
-                logger.info(f"{data['username']} loged!")
-                return jsonify({'message': 'success', 'token': token, 'refresh_token': refresh_token}), 200
-            elif not bcrypt.checkpw(plain, stored) or json_data['username'] != data['username']:
-                logger.warning(f"{data['username']} not loged!")
-                return error_response('username and password do not match',400)
-    except FileNotFoundError:
-        return error_response('username and password do not match',400)
+    if bcrypt.checkpw(plain, user.password.encode('utf-8')):
+        token = make_token(user.username)
+        refresh_token = make_refresh_token(user.username)
+        logger.info(f"{user.username} loged!")
+        return jsonify({'message': 'success', 'token': token, 'refresh_token': refresh_token}), 200
+    return error_response('username and password do not match', 400)
+
 @auth_bp.route('/refresh_token', methods=['POST'])
 @jwt_required(refresh=True)
 def refresh_token():
