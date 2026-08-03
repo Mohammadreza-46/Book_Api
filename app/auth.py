@@ -64,7 +64,7 @@ def login():
         return error_response('username and password do not match', 400)
 
     plain = data['password'].encode('utf-8')
-    if bcrypt.checkpw(plain, user.password.encode('utf-8')):
+    if bcrypt.checkpw(plain, user.password.decode('utf-8')):
         token = make_token(user.username)
         refresh_token = make_refresh_token(user.username)
         logger.info(f"{user.username} loged!")
