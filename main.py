@@ -27,9 +27,9 @@ secret = os.environ.get('JWT_SECRET_KEY')
 
 BASE_DIR = Path(__file__).resolve().parent
 # Use forward slashes in the SQLite URL. On Windows str(WindowsPath) yields
-# backslashes ("sqlite:///C:\...\database.db"), which SQLAlchemy can misparse;
-# as_posix() gives "C:/.../database.db", which works on every OS.
-default_sqlite = f"sqlite:///{(BASE_DIR / 'data' / 'database.db').as_posix()}"
+# backslashes ("sqlite:///C:\...\app.db"), which SQLAlchemy can misparse;
+# as_posix() gives "C:/.../app.db", which works on every OS.
+default_sqlite = f"sqlite:///{(BASE_DIR / 'data' / 'app.db').as_posix()}"
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('kx%40jj5%2Fg', default_sqlite)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 

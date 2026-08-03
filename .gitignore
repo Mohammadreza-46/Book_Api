@@ -48,4 +48,4 @@ instance/
 # Project-specific data that probably shouldn't be versioned
 data/Keys.json
 data/Users/
-data/database.db
+data/app.db

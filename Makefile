@@ -60,3 +60,8 @@ test-integration:
 
 clean:
 	@$(PYTHON) -c "import shutil, glob, os; [shutil.rmtree(p, ignore_errors=True) for p in glob.glob('**/__pycache__', recursive=True)]; [os.remove(f) for f in glob.glob('**/*.pyc', recursive=True)]; (os.path.exists('app.log') and os.remove('app.log')); print('Clean done.')"
+db-migrate:
+	flask --app main db migrate -m "$(m)"
+
+db-upgrade:
+	flask --app main db upgrade
