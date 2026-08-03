@@ -19,7 +19,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
-        logging.FileHandler('app.log'),
+        logging.FileHandler('app.log', encoding='utf-8'),
         logging.StreamHandler()
     ]
 )
@@ -46,10 +46,12 @@ def signup():
     if not isinstance(data.get('username'), str) or not isinstance(data.get('password'), str):
         return error_response('username and password must be strings', 400)
     data['password'] = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
-    file_name = os.path.join(os.path.join(dir_name,os.path.join('data','Users')),data['username'])+'.json'
+    users_dir = os.path.join(dir_name, 'data', 'Users')
+    os.makedirs(users_dir, exist_ok=True)
+    file_name = os.path.join(users_dir, data['username']) + '.json'
     if os.path.exists(file_name):
         return error_response('username already exists',409)
-    with open(file_name, 'w') as f:
+    with open(file_name, 'w', encoding='utf-8') as f:
         f.write(json.dumps(data))
     return jsonify({'message': 'success'})
 
@@ -63,8 +65,8 @@ def login():
         return error_response('username and password must be strings', 400)
     plain = data['password'].encode('utf-8')
     try:
-        file_name = os.path.join(os.path.join(dir_name, os.path.join('data','Users')), data['username']) + '.json'
-        with open(file_name, 'r') as f:
+        file_name = os.path.join(dir_name, 'data', 'Users', data['username']) + '.json'
+        with open(file_name, 'r', encoding='utf-8') as f:
             json_data = json.loads(f.read())
             stored = json_data['password'].encode('utf-8')
             if bcrypt.checkpw(plain, stored) and json_data['username'] == data['username']:

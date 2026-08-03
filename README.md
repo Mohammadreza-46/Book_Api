@@ -96,6 +96,12 @@ Then open `.env` and set a long, random value. **`JWT_SECRET_KEY` must be at lea
 JWT_SECRET_KEY=your-long-random-secret-key-at-least-32-chars
 ```
 
+The server loads `.env` automatically on startup (via `python-dotenv`), so once
+this file exists you never need to export the variable in your shell — this is
+the recommended path on Windows, where `export VAR=...` is not a valid command.
+Real environment variables still take precedence over `.env` when both are set.
+`.env` is git-ignored, so your secret is never committed.
+
 ### 3. Install dependencies
 
 ```bash
@@ -118,6 +124,10 @@ pip install -r requirements.txt
 |----------|----------|-------------|
 | `JWT_SECRET_KEY` | Yes | Secret used to sign JWT tokens. Must be a long, random string of **at least 32 characters**. |
 
+Variables can be set either as real environment variables or in a `.env` file
+next to `main.py` (loaded automatically at startup). If both are present, the
+real environment variable wins.
+
 ---
 
 ## Running the Server
@@ -126,7 +136,15 @@ pip install -r requirements.txt
 make run
 ```
 
-`make run` creates the required data directories, loads `JWT_SECRET_KEY` from your environment (falling back to an insecure dev default if it is unset), and starts the server. To run it manually with your own secret:
+`make run` creates the required data directories, loads `JWT_SECRET_KEY` from your environment (falling back to an insecure dev default if it is unset), and starts the server.
+
+If you created a `.env` file (see above), the secret is picked up automatically and you can simply run:
+
+```bash
+python main.py            # Windows: python main.py  (identical)
+```
+
+To run it manually by passing the secret through the shell instead:
 
 ```bash
 # Linux / macOS
@@ -134,6 +152,9 @@ JWT_SECRET_KEY=your-long-random-secret python3 main.py
 
 # Windows (PowerShell)
 $env:JWT_SECRET_KEY="your-long-random-secret"; python main.py
+
+# Windows (cmd)
+set JWT_SECRET_KEY=your-long-random-secret && python main.py
 ```
 
 The server listens at:
@@ -393,7 +414,8 @@ Requires the same body fields as Add Book. Only the owner of the book can update
 |--------|-------------|
 | `200` | Book updated |
 | `400` | Validation failed |
-| `404` | Book not found or user is not the owner |
+| `403` | User is not the owner of the book |
+| `404` | Book not found |
 
 ---
 
@@ -416,7 +438,8 @@ Only the owner of the book can delete it.
 | Status | Description |
 |--------|-------------|
 | `200` | Book deleted |
-| `404` | Book not found or user is not the owner |
+| `403` | User is not the owner of the book |
+| `404` | Book not found |
 
 ---
 
@@ -478,7 +501,7 @@ Search is case-insensitive and matches partial strings.
 | Access token lifetime | 1 hour |
 | Refresh token lifetime | 30 days |
 | Username validation | Alphanumeric and underscores only — blocks path traversal |
-| Secret key | Loaded from environment variable — never hardcoded |
+| Secret key | Loaded from an environment variable or git-ignored `.env` file — never hardcoded |
 
 ---
 
@@ -489,5 +512,7 @@ Search is case-insensitive and matches partial strings.
 | Flask | Web framework |
 | Flask-JWT-Extended | JWT authentication |
 | bcrypt | Password hashing |
+| python-dotenv | Loads configuration from a `.env` file |
+| Flask-SQLAlchemy / Flask-Migrate | Database models and migrations |
 | pytest | Testing |
 | requests | HTTP client for integration tests |

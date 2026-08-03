@@ -40,6 +40,10 @@ def flask_server():
 
     env = os.environ.copy()
     env["JWT_SECRET_KEY"] = TEST_JWT_SECRET
+    # Run a single-process server (no auto-reloader child), so terminate()
+    # below reliably stops it on every OS — Windows included — instead of
+    # leaving an orphan holding port 5000.
+    env["USE_RELOADER"] = "0"
 
     proc = subprocess.Popen(
         [sys.executable, "main.py"],
@@ -54,7 +58,11 @@ def flask_server():
     yield BASE_URL
 
     proc.terminate()
-    proc.wait()
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
 
     BOOK_LOADER.write_text(original_books)
     for f in USERS_DIR.glob("*.json"):

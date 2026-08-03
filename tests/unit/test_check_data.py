@@ -98,7 +98,9 @@ class TestCheckDataNl:
 class TestCheckDataEdgeCases:
     """
     Extra edge cases for check_data — type coercion, empty/whitespace strings,
-    and the non-string-value crash that powers issues #24 and #27.
+    and non-string values. check_data now checks the type BEFORE calling
+    .strip(), so empty/whitespace strings are rejected and non-string values
+    return False cleanly instead of crashing (issues #24 and #27 fixed).
     """
 
     FIELDS = [("name", str), ("age", int), ("active", bool)]
@@ -120,32 +122,26 @@ class TestCheckDataEdgeCases:
         data = {"name": "Alice", "age": None, "active": True}
         assert check_data(data, self.FIELDS) is False
 
-    def test_empty_string_for_str_field_is_currently_accepted(self):
-        # KNOWN BUG (#27): the empty-string guard sits inside the
-        # `if not isinstance(...)` branch, so it is unreachable for real
-        # strings. An empty string therefore passes check_data.
-        # This SHOULD return False.
+    def test_empty_string_for_str_field_is_rejected(self):
+        # Fixed (#27): an empty string must not satisfy a required str field.
         data = {"name": "", "age": 30, "active": True}
-        assert check_data(data, self.FIELDS) is True
+        assert check_data(data, self.FIELDS) is False
 
-    def test_whitespace_only_string_is_currently_accepted(self):
-        # KNOWN BUG (#27): same misplaced guard — "   " passes.
+    def test_whitespace_only_string_is_rejected(self):
+        # Fixed (#27): "   " is treated as empty and rejected.
         data = {"name": "   ", "age": 30, "active": True}
-        assert check_data(data, self.FIELDS) is True
+        assert check_data(data, self.FIELDS) is False
 
-    def test_int_for_str_field_raises_attributeerror(self):
-        # KNOWN BUG (#24): when a str field gets a non-string, check_data
-        # calls `.strip()` on it and raises AttributeError -> HTTP 500,
-        # instead of cleanly returning False.
+    def test_int_for_str_field_is_rejected(self):
+        # Fixed (#24): a non-string value for a str field returns False
+        # cleanly (the isinstance check runs before .strip()), no crash.
         data = {"name": 123, "age": 30, "active": True}
-        with pytest.raises(AttributeError):
-            check_data(data, self.FIELDS)
+        assert check_data(data, self.FIELDS) is False
 
-    def test_list_for_str_field_raises_attributeerror(self):
-        # KNOWN BUG (#24): same crash path with a list value.
+    def test_list_for_str_field_is_rejected(self):
+        # Fixed (#24): same clean rejection with a list value, no crash.
         data = {"name": ["x"], "age": 30, "active": True}
-        with pytest.raises(AttributeError):
-            check_data(data, self.FIELDS)
+        assert check_data(data, self.FIELDS) is False
 
     def test_all_fields_present_and_correct_with_many_fields(self):
         fields = [("a", str), ("b", int), ("c", str), ("d", int)]

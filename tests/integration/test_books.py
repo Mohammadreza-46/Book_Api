@@ -432,7 +432,10 @@ class TestUpdateBook:
             json=make_book(bid, book_name="Hijacked"),
             headers=auth_headers(tokens2["token"]),
         )
-        assert r.status_code == 404
+        # #33: a non-owner must get 403 (Forbidden), the same code delete_book
+        # returns — not 404, and never a 500 crash.
+        assert r.status_code == 403
+        assert r.json() == {"message": "You are not authorized!"}
 
     def test_non_owner_update_does_not_change_book_name(self):
         user1, user2 = unique_user(), unique_user()
@@ -682,4 +685,64 @@ class TestBookLifecycle:
             json=make_book(bid, book_name="Hijacked"),
             headers=auth_headers(stranger["token"]),
         )
-        assert r.status_code in (403, 404)  # BUG (#33): currently returns 500
+        assert r.status_code == 403  # #33: consistent 403 for ownership violation
+
+
+class TestErrorContract:
+    """
+    Regression guards for issues #20 and #33: error responses must use a
+    single shape ({"message": ...}) and ownership violations must return the
+    same status code (403) on both delete_book and update_book, while a
+    genuinely missing book returns 404 (never a 500 crash).
+    """
+
+    def _owned_book(self):
+        owner = register_and_login(unique_user())
+        bid = unique_book_id()
+        requests.post(f"{BASE_URL}/add_book", json=make_book(bid), headers=auth_headers(owner["token"]))
+        return owner, bid
+
+    def test_delete_and_update_agree_on_403_for_non_owner(self):
+        # #33: identical situation -> identical status code on both endpoints.
+        _, bid = self._owned_book()
+        stranger = auth_headers(register_and_login(unique_user())["token"])
+        d = requests.delete(f"{BASE_URL}/delete_book/{bid}", headers=stranger)
+        u = requests.post(f"{BASE_URL}/update_book/{bid}", json=make_book(bid), headers=stranger)
+        assert d.status_code == 403
+        assert u.status_code == 403
+        assert d.status_code == u.status_code
+
+    def test_update_missing_book_returns_404_not_500(self):
+        # #33 root cause: update_book used to KeyError on a missing id -> 500.
+        h = auth_headers(register_and_login(unique_user())["token"])
+        r = requests.post(f"{BASE_URL}/update_book/8888888", json=make_book(8888888), headers=h)
+        assert r.status_code == 404
+
+    def test_update_error_bodies_use_message_key(self):
+        # #20: every error path returns {"message": <str>}, never a bare
+        # string, a set, or an "error" key.
+        owner, bid = self._owned_book()
+        stranger = auth_headers(register_and_login(unique_user())["token"])
+        h_owner = auth_headers(owner["token"])
+
+        # 403 (not owner), 404 (missing), 400 (bad data) all via update_book
+        cases = [
+            requests.post(f"{BASE_URL}/update_book/{bid}", json=make_book(bid), headers=stranger),
+            requests.post(f"{BASE_URL}/update_book/8888888", json=make_book(8888888), headers=h_owner),
+            requests.post(f"{BASE_URL}/update_book/{bid}", json={"book_name": "x"}, headers=h_owner),
+        ]
+        for r in cases:
+            body = r.json()
+            assert isinstance(body, dict), f"expected object body, got {type(body).__name__}"
+            assert "message" in body
+            assert "error" not in body
+            assert isinstance(body["message"], str)
+
+    def test_search_empty_error_uses_message_key(self):
+        # #20: the search endpoint's empty-input error was once a set literal
+        # ({'Data is none'}); it must now be a proper {"message": ...} object.
+        h = auth_headers(register_and_login(unique_user())["token"])
+        r = requests.post(f"{BASE_URL}/search", json={}, headers=h)
+        assert r.status_code == 400
+        assert isinstance(r.json(), dict)
+        assert "message" in r.json()
