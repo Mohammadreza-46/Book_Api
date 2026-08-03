@@ -6,7 +6,8 @@ from app.check_data import check_data,check_data_nl
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from pathlib import Path
 import logging
-
+from app.models import User, Book
+from app.extensions import db
 logger = logging.getLogger(__name__)
 
 def is_owner(book_entry, username):
@@ -14,31 +15,18 @@ def is_owner(book_entry, username):
 def error_response(message, status_code):
     return jsonify({'message': message}), status_code
 dir_name = Path(__file__).resolve().parent.parent
-BOOKS_FILE = os.path.join(dir_name, 'data', 'Book_Loader.json')
-
-def load_books() -> dict:
-    with open(BOOKS_FILE, encoding='utf-8') as f:
-        return json.load(f)
-
-def save_books(books: dict) -> None:
-    tmp_path = BOOKS_FILE + '.tmp'
-    with open(tmp_path, 'w', encoding='utf-8') as f:
-        json.dump(books, f)
-    os.replace(tmp_path, BOOKS_FILE)
 
 books_bp = Blueprint('books', __name__)
-book = load_books()
+
 
 @books_bp.route('/get_all_book', methods=['GET'])
 @jwt_required()
 def get_all_book():
-    book2 = list(book.values())
     page = max(request.args.get('page', 1, type=int), 1)
     per_page = max(request.args.get('per_page', 10, type=int), 0)
-    start = (page - 1) * per_page
-    end = start + per_page
-    paginated = book2[start:end]
-    return jsonify({'book': paginated}), 200
+    query = db.select(Book)
+    pagination = db.paginate(query, page=page, per_page=per_page or 10, error_out=False)
+    return jsonify({'book': [b.to_dict() for b in pagination.items]}), 200
 @books_bp.route('/add_book', methods=['POST'])
 @jwt_required()
 def add_book():
@@ -77,30 +65,33 @@ def add_book():
         'added_at': datetime.now().strftime('%Y-%m-%d'),
         'added_by': get_jwt_identity()
     }
-    if str(new_book['book_id']) in book:
+    exists = db.session.get(Book, data['book_id'])
+    if exists is not None:
         return error_response('book_id already exists!', 400)
-    book[str(new_book['book_id'])] = new_book
-    save_books(book)
-    logger.info(f'{get_jwt_identity()} added book {new_book["book_id"]}')
+
+    owner = db.session.scalar(db.select(User).filter_by(username=get_jwt_identity()))
+    new_book = Book(
+        book_id=data['book_id'], book_name=data['book_name'],
+        book_content=data['book_content'], writer=data['writer'],
+        published_year=data['published_year'], rating=data['rating'],
+        genre=data['genre'], created_at=data['created_at'], owner=owner,
+    )
+    db.session.add(new_book)
+    db.session.commit()
     return jsonify({'Success': 'New book added'}), 201
 @books_bp.route('/delete_book/<int:book_id>', methods=['DELETE'])
 @jwt_required()
 def delete_book(book_id):
-    deleted_book = None
-    for i in book.values():
-        if i["book_id"] == book_id:
-            deleted_book = str(i['book_id'])
-            break
-    if deleted_book == None:
-        logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
+    book_row = db.session.get(Book, book_id)
+    if book_row is None:
         return error_response('book_id not found!', 404)
-    if not is_owner(book[str(book_id)],get_jwt_identity()):
-        logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
+    if book_row.owner.username != get_jwt_identity():
         return error_response('you are not authorized!', 403)
-    del book[deleted_book]
-    save_books(book)
-    logger.info(f'{get_jwt_identity()} deleted book {book_id}')
+    db.session.delete(book_row)
+    db.session.commit()
     return jsonify({'Success': 'Book deleted'}), 200
+
+
 @books_bp.route('/search', methods=['POST'])
 @jwt_required()
 def search():
@@ -111,29 +102,25 @@ def search():
         pass
     elif not check_data_nl(data,required):
         return error_response('At least one search field is required', 400)
+    # بعد
+    conditions = []
     if 'book_name' in data:
-        for i in book.values():
-            if data['book_name'].lower() in i['book_name'].lower():
-                show.append(i)
+        conditions.append(Book.book_name.ilike(f"%{data['book_name']}%"))
     if 'genre' in data:
-        for i in book.values():
-            if data['genre'].lower() in i['genre'].lower():
-                show.append(i)
+        conditions.append(Book.genre.ilike(f"%{data['genre']}%"))
     if 'writer' in data:
-        for i in book.values():
-            if data['writer'].lower() in i['writer'].lower():
-                show.append(i)
-    return jsonify(show), 200
-@books_bp.route('/update_book/<int:book_id>', methods=['POST'])
+        conditions.append(Book.writer.ilike(f"%{data['writer']}%"))
+    results = db.session.scalars(db.select(Book).filter(db.or_(*conditions))).all()
+    return jsonify([b.to_dict() for b in results]), 200
+@books_bp.route('/update_book', methods=['POST'])
 @jwt_required()
-def update_book(book_id):
+def update_book():
     data = request.get_json()
     required = [
         ('book_name', str)
         , ('book_content', str)
         , ('book_id', int)
         , ('writer', str)
-        , ('published_year', int)
         , ('rating', int)
         , ('genre', str),
         ('created_at', str)
@@ -142,15 +129,12 @@ def update_book(book_id):
         logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('The data content not has all the required fields!', 400)
 
-    key = str(book_id)
-    if key not in book:
-        logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
+    exists = db.session.get(Book, data['book_id'])
+    if exists is None:
         return error_response('book_id not found!', 404)
-
-    if not is_owner(book[key], get_jwt_identity()):
-        logger.warning(f'{get_jwt_identity()} is not the owner {request.path}')
-        return error_response('You are not authorized!', 403)
-
+    book_row = db.session.get(Book, data['book_id'])
+    if  book_row.owner.username != get_jwt_identity():
+        return error_response('you are not authorized!', 403)
     if data['rating'] < 0 or data['rating'] > 5:
         logger.warning(f"{get_jwt_identity()} sent invalid data to {request.path}")
         return error_response('the rating is out of the range(0/5)', 400)
@@ -159,26 +143,24 @@ def update_book(book_id):
         logger.warning(f"{get_jwt_identity()} sent invalid data to {request.path}")
         return error_response(f'the published_year is out of the range(0/{curent_year})', 400)
 
-    entry = book[key]
-    entry['book_name'] = data['book_name']
-    entry['book_content'] = data['book_content']
-    entry['book_id'] = book_id
-    entry['writer'] = data['writer']
-    entry['published_year'] = data['published_year']
-    entry['rating'] = data['rating']
-    entry['genre'] = data['genre']
-    entry['created_at'] = data['created_at']
-    entry['added_at'] = datetime.now().strftime('%Y-%m-%d')
-    entry['added_by'] = get_jwt_identity()
+    book_row.book_name = data['book_name']
+    book_row.book_content = data['book_content']
+    book_row.book_id = data['book_id']
+    book_row.writer = data['writer']
+    book_row.rating = data['rating']
+    book_row.genre = data['genre']
+    book_row.created_at = data['created_at']
+    book_row.owner = get_jwt_identity()
+    book_row.published_year = curent_year
+    db.session.add(book_row)
+    db.session.commit()
 
-    book[key] = entry
-    save_books(book)
-    logger.info(f'{get_jwt_identity()} updated book {book_id}')
+    logger.info(f'{get_jwt_identity()} updated book {data['book_id']}')
     return jsonify({'Success': 'Book updated'}), 200
 @books_bp.route('/get_book/<int:book_id>', methods=['get'])
 @jwt_required()
 def get_book(book_id):
-    for i in book.values():
-        if i['book_id'] == book_id:
-            return jsonify(i), 200
-    return error_response('book_id not found!', 404)
+    book_row = db.session.get(Book, book_id)
+    if book_row is None:
+        return error_response('book_id not found!', 404)
+    return jsonify(book_row.to_dict()), 200
