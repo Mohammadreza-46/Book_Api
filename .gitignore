@@ -46,6 +46,4 @@ instance/
 .env.*.local
 
 # Project-specific data that probably shouldn't be versioned
-data/Keys.json
-data/Users/
 data/app.db

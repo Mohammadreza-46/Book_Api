@@ -150,7 +150,6 @@ def update_book():
     book_row.rating = data['rating']
     book_row.genre = data['genre']
     book_row.created_at = data['created_at']
-    book_row.owner = get_jwt_identity()
     book_row.published_year = curent_year
     db.session.add(book_row)
     db.session.commit()
