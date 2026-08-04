@@ -102,7 +102,6 @@ def search():
         pass
     elif not check_data_nl(data,required):
         return error_response('At least one search field is required', 400)
-    # بعد
     conditions = []
     if 'book_name' in data:
         conditions.append(Book.book_name.ilike(f"%{data['book_name']}%"))
