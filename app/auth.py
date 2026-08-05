@@ -60,7 +60,11 @@ def signup():
 @auth_bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
+    required = [('username', str), ('password', str)]
+    if not check_data(data, required):
+        return error_response('data is bad!', 400)
     user = db.session.scalar(db.select(User).filter_by(username=data['username'].strip()))
+    required = [('username', str), ('password', str)]
     if user is None:
         return error_response('username and password do not match', 400)
 
