@@ -111,9 +111,9 @@ def search():
         conditions.append(Book.writer.ilike(f"%{data['writer']}%"))
     results = db.session.scalars(db.select(Book).filter(db.or_(*conditions))).all()
     return jsonify([b.to_dict() for b in results]), 200
-@books_bp.route('/update_book', methods=['POST'])
+@books_bp.route('/update_book/<int:book_id>', methods=['POST'])
 @jwt_required()
-def update_book():
+def update_book(book_id):
     data = request.get_json()
     required = [
         ('book_name', str)
@@ -128,10 +128,10 @@ def update_book():
         logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('The data content not has all the required fields!', 400)
 
-    exists = db.session.get(Book, data['book_id'])
+    exists = db.session.get(Book, book_id)
     if exists is None:
         return error_response('book_id not found!', 404)
-    book_row = db.session.get(Book, data['book_id'])
+    book_row = db.session.get(Book, book_id)
     if  book_row.owner.username != get_jwt_identity():
         return error_response('you are not authorized!', 403)
     if data['rating'] < 0 or data['rating'] > 5:
