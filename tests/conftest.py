@@ -1,6 +1,5 @@
 import os
 import subprocess
-import sys
 import time
 import uuid
 from pathlib import Path
@@ -10,12 +9,13 @@ import sys
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_DIR / "data"
+TEST_DB = DATA_DIR / "test_app.db"
 USERS_DIR = DATA_DIR / "Users"
 BOOK_LOADER = DATA_DIR / "Book_Loader.json"
 BASE_URL = "http://localhost:5000"
 TEST_JWT_SECRET = "integration-test-secret-key-very-long-and-secure"
-
-
+if TEST_DB.exists():
+    TEST_DB.unlink()
 def _wait_for_server(timeout=15):
     end = time.time() + timeout
     while time.time() < end:
@@ -37,9 +37,10 @@ def flask_server():
     BOOK_LOADER.write_text("{}")
     for f in USERS_DIR.glob("*.json"):
         f.unlink()
-
     env = os.environ.copy()
     env["JWT_SECRET_KEY"] = TEST_JWT_SECRET
+    env["USE_RELOADER"] = "0"
+    env["DATABASE_URL"] = "sqlite:///" + TEST_DB.as_posix()
     # Run a single-process server (no auto-reloader child), so terminate()
     # below reliably stops it on every OS — Windows included — instead of
     # leaving an orphan holding port 5000.
@@ -108,3 +109,5 @@ def make_book(book_id, **overrides):
     }
     book.update(overrides)
     return book
+if TEST_DB.exists():
+    TEST_DB.unlink()
