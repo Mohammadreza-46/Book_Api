@@ -2,7 +2,6 @@
 Unit tests for the helper functions in app/books.py:
   - error_response  (uniform error shape, issue #20)
   - is_owner        (ownership check contract, issues #21 / #33)
-  - load_books / save_books (data-access layer, issue #18)
 
 These test the functions directly, with no HTTP server. `error_response`
 uses `jsonify`, so it needs a Flask application context — provided by the
@@ -71,48 +70,7 @@ class TestIsOwner:
         assert books.is_owner({"book_id": 3}, "alice") is False
 
 
-class TestLoadSaveBooks:
-    """load_books / save_books should round-trip and write atomically."""
-
-    def _point_to_temp(self, tmp_path, monkeypatch):
-        f = tmp_path / "Book_Loader.json"
-        f.write_text("{}")
-        monkeypatch.setattr(books, "BOOKS_FILE", str(f))
-        return f
-
-    def test_roundtrip_preserves_data(self, tmp_path, monkeypatch):
-        self._point_to_temp(tmp_path, monkeypatch)
-        data = {"1": {"book_id": 1, "book_name": "Dune"}}
-        books.save_books(data)
-        assert books.load_books() == data
-
-    def test_save_overwrites_previous_content(self, tmp_path, monkeypatch):
-        self._point_to_temp(tmp_path, monkeypatch)
-        books.save_books({"1": {"book_id": 1}})
-        books.save_books({"2": {"book_id": 2}})
-        assert books.load_books() == {"2": {"book_id": 2}}
-
-    def test_save_leaves_no_tmp_file_behind(self, tmp_path, monkeypatch):
-        self._point_to_temp(tmp_path, monkeypatch)
-        books.save_books({"a": 1})
-        assert not (tmp_path / "Book_Loader.json.tmp").exists()
-
-    def test_load_empty_file_returns_empty_dict(self, tmp_path, monkeypatch):
-        self._point_to_temp(tmp_path, monkeypatch)
-        assert books.load_books() == {}
-
-    def test_roundtrip_preserves_non_ascii_text(self, tmp_path, monkeypatch):
-        # Persian/Unicode book data must survive save -> load unchanged.
-        # load_books/save_books open files with encoding='utf-8'; without that,
-        # Windows would fall back to the locale codepage and corrupt or crash.
-        self._point_to_temp(tmp_path, monkeypatch)
-        data = {
-            "1": {
-                "book_id": 1,
-                "book_name": "کتاب فارسی",
-                "writer": "نویسنده",
-                "book_content": "متنِ نمونه با emoji 📚",
-            }
-        }
-        books.save_books(data)
-        assert books.load_books() == data
+# NOTE: the old TestLoadSaveBooks class was removed. It exercised
+# books.BOOKS_FILE / load_books / save_books — the JSON file-storage layer that
+# the database migration (issues #37–#46) intentionally deleted. Persistence is
+# now covered by tests/integration/test_database.py against the real DB.

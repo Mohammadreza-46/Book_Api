@@ -24,8 +24,13 @@ books_bp = Blueprint('books', __name__)
 def get_all_book():
     page = max(request.args.get('page', 1, type=int), 1)
     per_page = max(request.args.get('per_page', 10, type=int), 0)
+    # An explicit per_page=0 (or negative) means "zero items per page": return an
+    # empty page instead of silently falling back to the default and handing back
+    # a full page of results the client did not ask for.
+    if per_page == 0:
+        return jsonify({'book': []}), 200
     query = db.select(Book)
-    pagination = db.paginate(query, page=page, per_page=per_page or 10, error_out=False)
+    pagination = db.paginate(query, page=page, per_page=per_page, error_out=False)
     return jsonify({'book': [b.to_dict() for b in pagination.items]}), 200
 @books_bp.route('/add_book', methods=['POST'])
 @jwt_required()

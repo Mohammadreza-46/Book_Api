@@ -23,8 +23,9 @@ from tests.conftest import (
     make_book,
 )
 
-# The server falls back to this database when no override is set (see main.py).
-DEV_DB = DATA_DIR / "app.db"
+# The integration server runs against an isolated throwaway DB (issue #46),
+# pointed at by DATABASE_URL in conftest.py. Assertions read that same file, so
+# they never touch the developer's data/app.db.
 TEST_DB = DATA_DIR / "test_app.db"
 
 
@@ -42,7 +43,7 @@ class TestUserPersistence:
     def test_signup_creates_a_users_row(self):
         username = unique_user()
         register(username)
-        rows = _query(DEV_DB, "SELECT username FROM users WHERE username = ?", (username,))
+        rows = _query(TEST_DB, "SELECT username FROM users WHERE username = ?", (username,))
         assert rows, f"no users row created for {username}"
 
     def test_signup_does_not_create_a_json_user_file(self):
@@ -55,7 +56,7 @@ class TestUserPersistence:
     def test_password_is_stored_as_bcrypt_hash_in_db(self):
         username = unique_user()
         register(username, "PlainPassword1")
-        rows = _query(DEV_DB, "SELECT password FROM users WHERE username = ?", (username,))
+        rows = _query(TEST_DB, "SELECT password FROM users WHERE username = ?", (username,))
         assert rows, "user not found in db"
         stored = rows[0][0]
         assert stored != "PlainPassword1"
@@ -70,7 +71,7 @@ class TestBookPersistence:
         bid = unique_book_id()
         requests.post(f"{BASE_URL}/add_book", json=make_book(bid, book_name="DB Row Book"),
                       headers=auth_headers(tokens["token"]))
-        rows = _query(DEV_DB, "SELECT book_name FROM books WHERE book_id = ?", (bid,))
+        rows = _query(TEST_DB, "SELECT book_name FROM books WHERE book_id = ?", (bid,))
         assert rows and rows[0][0] == "DB Row Book"
 
     def test_book_owner_id_links_to_the_users_table(self):
@@ -80,7 +81,7 @@ class TestBookPersistence:
         requests.post(f"{BASE_URL}/add_book", json=make_book(bid),
                       headers=auth_headers(tokens["token"]))
         rows = _query(
-            DEV_DB,
+            TEST_DB,
             "SELECT u.username FROM books b JOIN users u ON b.owner_id = u.id "
             "WHERE b.book_id = ?",
             (bid,),
@@ -93,21 +94,19 @@ class TestBookPersistence:
         bid = unique_book_id()
         requests.post(f"{BASE_URL}/add_book", json=make_book(bid), headers=h)
         requests.delete(f"{BASE_URL}/delete_book/{bid}", headers=h)
-        rows = _query(DEV_DB, "SELECT 1 FROM books WHERE book_id = ?", (bid,))
+        rows = _query(TEST_DB, "SELECT 1 FROM books WHERE book_id = ?", (bid,))
         assert rows == []
 
 
 class TestTestDatabaseIsolation:
     """
-    Issue #46: integration tests should run against a SEPARATE test database
-    (e.g. data/test_app.db via DATABASE_URL), not pollute the developer's
-    data/app.db. conftest.py does not set this up yet.
+    Issue #46: integration tests run against a SEPARATE test database
+    (data/test_app.db via DATABASE_URL), so they never pollute the developer's
+    data/app.db. conftest.py sets DATABASE_URL and builds the schema there.
     """
 
     def test_integration_server_uses_isolated_test_database(self):
-        # EXPECTED TO FAIL (open bug #46): no dedicated test database is
-        # configured, so the live server reads/writes the real dev DB.
         assert TEST_DB.exists(), (
-            "tests run against the dev database (data/app.db); "
-            "no isolated data/test_app.db was created"
+            "the isolated data/test_app.db was not created; the server is not "
+            "honouring DATABASE_URL (issue #40/#46)"
         )
