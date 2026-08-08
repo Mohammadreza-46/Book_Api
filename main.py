@@ -24,13 +24,16 @@ auth_bp = auth.auth_bp
 jwt_manager = JWTManager(app)
 
 secret = os.environ.get('JWT_SECRET_KEY')
-DATABASE_URL="postgresql+psycopg://user:password@localhost:5432/book_api"
 BASE_DIR = Path(__file__).resolve().parent
 # Use forward slashes in the SQLite URL. On Windows str(WindowsPath) yields
 # backslashes ("sqlite:///C:\...\app.db"), which SQLAlchemy can misparse;
 # as_posix() gives "C:/.../app.db", which works on every OS.
 default_sqlite = f"sqlite:///{(BASE_DIR / 'data' / 'app.db').as_posix()}"
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(DATABASE_URL, default_sqlite)
+# The DB connection string is overridable via the DATABASE_URL env var, so tests
+# (data/test_app.db) and production (e.g. PostgreSQL:
+# postgresql+psycopg://user:password@host:5432/book_api) can point the same code
+# at a different database. When it is unset, fall back to the local SQLite file.
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', default_sqlite)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 

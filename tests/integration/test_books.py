@@ -435,7 +435,7 @@ class TestUpdateBook:
         # #33: a non-owner must get 403 (Forbidden), the same code delete_book
         # returns — not 404, and never a 500 crash.
         assert r.status_code == 403
-        assert r.json() == {"message": "You are not authorized!"}
+        assert r.json() == {"message": "you are not authorized!"}
 
     def test_non_owner_update_does_not_change_book_name(self):
         user1, user2 = unique_user(), unique_user()

@@ -39,12 +39,28 @@ def flask_server():
         f.unlink()
     env = os.environ.copy()
     env["JWT_SECRET_KEY"] = TEST_JWT_SECRET
-    env["USE_RELOADER"] = "0"
-    env["DATABASE_URL"] = "sqlite:///" + TEST_DB.as_posix()
     # Run a single-process server (no auto-reloader child), so terminate()
     # below reliably stops it on every OS — Windows included — instead of
     # leaving an orphan holding port 5000.
     env["USE_RELOADER"] = "0"
+    # Point the whole stack at an isolated throwaway DB (issue #46) so tests
+    # never touch the developer's data/app.db.
+    env["DATABASE_URL"] = "sqlite:///" + TEST_DB.as_posix()
+
+    # Build the schema in the fresh test DB before the server starts. main.py
+    # does not create tables on its own, so without this the server would come
+    # up against an empty file and every DB write would 500 with "no such
+    # table". `flask db upgrade` runs the migrations (issue #42) into test_app.db.
+    upgrade = subprocess.run(
+        [sys.executable, "-m", "flask", "--app", "main", "db", "upgrade"],
+        cwd=str(PROJECT_DIR), env=env,
+        capture_output=True, text=True,
+    )
+    if upgrade.returncode != 0:
+        raise RuntimeError(
+            "flask db upgrade failed while preparing the test database:\n"
+            + upgrade.stderr[-1000:]
+        )
 
     proc = subprocess.Popen(
         [sys.executable, "main.py"],

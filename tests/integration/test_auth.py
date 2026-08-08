@@ -79,17 +79,11 @@ class TestSignup:
         r = requests.post(f"{BASE_URL}/signup", json={"username": unique_user(), "password": None})
         assert r.status_code == 400
 
-    def test_password_is_stored_hashed_not_plaintext(self):
-        username = unique_user()
-        register(username, "PlainPassword1")
-        user_file = (
-            __import__("pathlib").Path(__file__).resolve().parent.parent.parent
-            / "data" / "Users" / f"{username}.json"
-        )
-        import json
-        stored = json.loads(user_file.read_text())
-        assert stored["password"] != "PlainPassword1"
-        assert stored["password"].startswith("$2b$")
+    # NOTE: the old test_password_is_stored_hashed_not_plaintext was removed. It
+    # read data/Users/<username>.json — the JSON user file that the database
+    # migration deliberately dropped. The DB-based equivalent lives in
+    # tests/integration/test_database.py::TestUserPersistence
+    # ::test_password_is_stored_as_bcrypt_hash_in_db.
 
     def test_username_with_underscores_is_accepted(self):
         r = register("valid_user_1")
