@@ -14,8 +14,23 @@ USERS_DIR = DATA_DIR / "Users"
 BOOK_LOADER = DATA_DIR / "Book_Loader.json"
 BASE_URL = "http://localhost:5000"
 TEST_JWT_SECRET = "integration-test-secret-key-very-long-and-secure"
-if TEST_DB.exists():
-    TEST_DB.unlink()
+
+
+def _remove_test_db():
+    # Delete a leftover test DB from a previous run. Wrapped in try/except
+    # because on Windows a still-open SQLite file cannot be deleted (raises
+    # PermissionError); swallowing it lets the run continue and the file gets
+    # reused/rebuilt rather than crashing at import time.
+    try:
+        if TEST_DB.exists():
+            TEST_DB.unlink()
+    except OSError:
+        pass
+
+
+_remove_test_db()
+
+
 def _wait_for_server(timeout=15):
     end = time.time() + timeout
     while time.time() < end:
@@ -125,5 +140,3 @@ def make_book(book_id, **overrides):
     }
     book.update(overrides)
     return book
-if TEST_DB.exists():
-    TEST_DB.unlink()
