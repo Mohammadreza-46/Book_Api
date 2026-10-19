@@ -110,3 +110,8 @@ def change_password():
     ).decode('utf-8')
     db.session.commit()
     return jsonify({'message': 'success'}), 200
+@auth_bp.route('/dashboard', methods=['GET'])
+@jwt_required()
+def dashboard():
+    username = get_jwt_identity()
+    return jsonify({'message': f'hello {username}'})
