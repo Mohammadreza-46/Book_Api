@@ -42,22 +42,23 @@ dir_name = Path(__file__).resolve().parent.parent
 
 books_bp = Blueprint('books', __name__)
 
+MAX_PER_PAGE = 100
 
 @books_bp.route('/get_all_book', methods=['GET'])
 @jwt_required()
 def get_all_book():
     page = max(request.args.get('page', 1, type=int), 1)
-    per_page = max(request.args.get('per_page', 10, type=int), 0)
+    per_page = min(max(request.args.get('per_page', 10, type=int), 0), MAX_PER_PAGE)
 
     query = db.select(Book)
 
     genre = request.args.get('genre')
     if genre:
-        query = query.filter(Book.genre.ilike(genre))
+        query = query.filter(db.func.lower(Book.genre) == genre.lower())
 
     writer = request.args.get('writer')
     if writer:
-        query = query.filter(Book.writer.ilike(writer))
+        query = query.filter(db.func.lower(Book.writer) == writer.lower())
 
     min_rating = request.args.get('min_rating', type=int)
     if min_rating is not None:
@@ -66,12 +67,13 @@ def get_all_book():
     column = resolve_sort(request.args.get('sort'))
     if request.args.get('order') == 'desc':
         column = column.desc()
-    query = query.order_by(column)
+    query = query.order_by(column, Book.book_id)
 
     pagination = db.paginate(query, page=page, per_page=per_page or 1, error_out=False)
     meta = pagination_meta(pagination)
     if per_page == 0:
         meta['per_page'] = 0
+        meta['total_pages'] = 0
         return jsonify({'book': [], 'pagination': meta}), 200
     return jsonify({'book': [b.to_dict() for b in pagination.items], 'pagination': meta}), 200
 @books_bp.route('/add_book', methods=['POST'])
@@ -94,24 +96,12 @@ def add_book():
         logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('data is bad!', 400)
     if data['rating'] < 0 or data['rating'] > 5:
-        logger.warning(f"{get_jwt_identity} sent invalid data to {request.path}")
+        logger.warning(f"{get_jwt_identity()} sent invalid data to {request.path}")
         return error_response('the rating is out of the range(0/5)',400)
     curent_year = datetime.today().year
     if data['published_year'] < 0 or data['published_year'] > curent_year:
         logger.warning(f"{get_jwt_identity()} sent invalid data to {request.path}")
         return error_response(f'the published_year is out of the range(0/{curent_year})',400)
-    new_book = {
-        'book_name': data['book_name'],
-        'book_content': data['book_content'],
-        'book_id': data['book_id'],
-        'writer': data['writer'],
-        'published_year': data['published_year'],
-        'rating': data['rating'],
-        'genre': data['genre'],
-        'created_at': data['created_at'],
-        'added_at': datetime.now().strftime('%Y-%m-%d'),
-        'added_by': get_jwt_identity()
-    }
     exists = db.session.get(Book, data['book_id'])
     if exists is not None:
         return error_response('book_id already exists!', 400)
@@ -166,6 +156,7 @@ def update_book(book_id):
         , ('book_content', str)
         , ('book_id', int)
         , ('writer', str)
+        , ('published_year', int)
         , ('rating', int)
         , ('genre', str),
         ('created_at', str)
@@ -174,12 +165,13 @@ def update_book(book_id):
         logger.warning(f'{get_jwt_identity()} sent invalid data to {request.path}')
         return error_response('The data content not has all the required fields!', 400)
 
-    exists = db.session.get(Book, book_id)
-    if exists is None:
-        return error_response('book_id not found!', 404)
     book_row = db.session.get(Book, book_id)
-    if  book_row.owner.username != get_jwt_identity():
+    if book_row is None:
+        return error_response('book_id not found!', 404)
+    if book_row.owner.username != get_jwt_identity():
         return error_response('you are not authorized!', 403)
+    if data['book_id'] != book_id:
+        return error_response('book_id can not be changed', 400)
     if data['rating'] < 0 or data['rating'] > 5:
         logger.warning(f"{get_jwt_identity()} sent invalid data to {request.path}")
         return error_response('the rating is out of the range(0/5)', 400)
@@ -190,16 +182,15 @@ def update_book(book_id):
 
     book_row.book_name = data['book_name']
     book_row.book_content = data['book_content']
-    book_row.book_id = data['book_id']
     book_row.writer = data['writer']
     book_row.rating = data['rating']
     book_row.genre = data['genre']
     book_row.created_at = data['created_at']
-    book_row.published_year = curent_year
+    book_row.published_year = data['published_year']
     db.session.add(book_row)
     db.session.commit()
 
-    logger.info(f'{get_jwt_identity()} updated book {data['book_id']}')
+    logger.info(f"{get_jwt_identity()} updated book {book_id}")
     return jsonify({'Success': 'Book updated'}), 200
 @books_bp.route('/get_book/<int:book_id>', methods=['get'])
 @jwt_required()
@@ -212,7 +203,7 @@ def get_book(book_id):
 @jwt_required()
 def my_books():
     page = max(request.args.get('page', 1, type=int), 1)
-    per_page = max(request.args.get('per_page', 10, type=int), 0)
+    per_page = min(max(request.args.get('per_page', 10, type=int), 0), MAX_PER_PAGE)
 
     query = (
         db.select(Book)
@@ -225,6 +216,7 @@ def my_books():
 
     if per_page == 0:
         meta['per_page'] = 0
+        meta['total_pages'] = 0
         return jsonify({'book': [], 'pagination': meta}), 200
     return jsonify({'book': [b.to_dict() for b in pagination.items], 'pagination': meta}), 200
 @books_bp.route('/genres', methods=['GET'])
