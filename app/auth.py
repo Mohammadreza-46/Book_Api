@@ -114,5 +114,5 @@ def change_password():
 @jwt_required()
 def dashboard():
     username = get_jwt_identity()
-    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = datetime.datetime.now().strftime('%Y-%m-%d')
     return jsonify({'message': f'hello {username}\n{now}'}), 200
