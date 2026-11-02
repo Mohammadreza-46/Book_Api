@@ -61,6 +61,9 @@ def signup():
     existing = db.session.scalar(db.select(User).filter_by(username=data['username']))
     if existing is not None:
         return error_response('username already exists', 409)
+    problem = validate_new_password(data["password"])
+    if problem is not None:
+        return error_response(problem, 400)
     hashed = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
     user = User(username=data['username'].strip(), password=hashed)
     db.session.add(user)
