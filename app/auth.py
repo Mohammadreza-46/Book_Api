@@ -35,6 +35,15 @@ def make_token(identity):
 def make_refresh_token(identity):
     return create_refresh_token(identity=identity,expires_delta=datetime.timedelta(days=30))
 
+
+MIN_PASSWORD_LENGTH = 8
+def validate_new_password(password):
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return 'new password is too short (min 8 characters)'
+    if len(password.encode('utf-8')) > 72:
+        return 'new password is too long (max 72 bytes)'
+    return None
+
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
     data = request.get_json()
@@ -105,10 +114,18 @@ def change_password():
     if not bcrypt.checkpw(data['old_password'].encode('utf-8'), user.password.encode('utf-8')):
         return error_response('old password is incorrect', 403)
 
+    problem = validate_new_password(data['new_password'])
+    if problem is not None:
+        return error_response(problem, 400)
+
+    if data['new_password'] == data['old_password']:
+        return error_response('new password must be different from the old password', 400)
+
     user.password = bcrypt.hashpw(
         data['new_password'].encode('utf-8'), bcrypt.gensalt(12)
     ).decode('utf-8')
     db.session.commit()
+    logger.info(f"{user.username} changed the password")
     return jsonify({'message': 'success'}), 200
 @auth_bp.route('/dashboard', methods=['GET'])
 @jwt_required()
